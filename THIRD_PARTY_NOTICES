@@ -1,0 +1,41 @@
+The capture setup and nominal conversion values use information from
+scopething (https://github.com/jonathanhogg/scopething).
+
+Copyright (c) 2016, Jonathan Hogg
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+----
+
+The files in dslogic_firmware are the FX2 firmware and FPGA bitstreams for
+the original DreamSourceLab DSLogic. They are copied without change from
+DSView (https://github.com/DreamSourceLab/DSView), directory DSView/res,
+commit 2e9e2c8e726df4ef5687d39b83d4f797cc44b574.
+
+  DSLogic.fw    sha256 c55c71881e45f8087680268d00892ba3258740c019f2b1f1cf2eff06508dfa17
+  DSLogic33.bin sha256 f8980ad20504e8bae3af1ef9d7fb92ab9f8df05b4ae6d124da9f7eb6cab84df5
+  DSLogic50.bin sha256 2c7dc21a74adf60b7dbf357f237d613bbddfff75e21f0b9a0474874f4ba58463
+
+Copyright (C) DreamSourceLab <support@dreamsourcelab.com>.
+
+DreamSourceLab publishes the source for this firmware under the GNU General
+Public License, version 2:
+
+  FX2 firmware: https://github.com/DreamSourceLab/DSLogic-fw
+  FPGA HDL:     https://github.com/DreamSourceLab/DSLogic-hdl
+
+DSView, which distributes these files, is licensed under the GNU General
+Public License, version 3 or later. The files run on the DSLogic, not on
+the host. The dslogic package sends them to the device and does not link
+with them.
+
+The dslogic package follows the USB protocol of the DSView libsigrok4DSL
+driver (libsigrok4DSL/hardware/DSL). Copyright (C) 2013 DreamSourceLab
+and the sigrok project.
