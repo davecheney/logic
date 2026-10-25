@@ -17,9 +17,11 @@ Supported analysers:
 | `logic-probe` | Check that an analyser responds, without a capture |
 | [`logic-edges`](docs/logic-edges.md) | List the level changes in a capture |
 | [`logic-i2c`](docs/logic-i2c.md) | Decode I2C in a capture |
+| [`logic-uart`](docs/logic-uart.md) | Decode UART in a capture |
 
 Every command that opens an analyser needs `-device`. There is no default
-device. `logic-edges` and `logic-i2c` read a `logic-capture` JSON file.
+device. `logic-edges`, `logic-i2c`, and `logic-uart` read a `logic-capture`
+JSON file.
 
 ## Install
 
