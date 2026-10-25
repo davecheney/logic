@@ -10,6 +10,25 @@ import (
 	"strconv"
 )
 
+// Read reads a JSON capture written by Write.
+func Read(r io.Reader) (*Trace, error) {
+	var tr Trace
+	if err := json.NewDecoder(r).Decode(&tr); err != nil {
+		return nil, fmt.Errorf("logic: read capture: %w", err)
+	}
+	switch {
+	case tr.Width != 0 && tr.Width != 1 && tr.Width != 2:
+		return nil, fmt.Errorf("logic: read capture: sample_bytes %d is not 1 or 2", tr.Width)
+	case tr.Width == 2 && len(tr.Samples)%2 != 0:
+		return nil, fmt.Errorf("logic: read capture: odd byte count with sample_bytes 2")
+	case !(tr.Rate > 0) || math.IsInf(tr.Rate, 0):
+		return nil, fmt.Errorf("logic: read capture: invalid sample_rate_hz")
+	case tr.Len() == 0:
+		return nil, fmt.Errorf("logic: read capture: no samples")
+	}
+	return &tr, nil
+}
+
 // Write writes a JSON, CSV, or VCD capture with the actual sample rate
 // and trigger position. CSV and VCD times are relative to the first sample.
 func Write(w io.Writer, format string, tr *Trace) error {
