@@ -15,8 +15,11 @@ Supported analysers:
 |---|---|
 | [`logic-capture`](docs/logic-capture.md) | Capture once and write JSON, CSV, or VCD |
 | `logic-probe` | Check that an analyser responds, without a capture |
+| [`logic-edges`](docs/logic-edges.md) | List the level changes in a capture |
+| [`logic-i2c`](docs/logic-i2c.md) | Decode I2C in a capture |
 
-Every command needs `-device`. There is no default device.
+Every command that opens an analyser needs `-device`. There is no default
+device. `logic-edges` and `logic-i2c` read a `logic-capture` JSON file.
 
 ## Install
 
@@ -41,7 +44,7 @@ More examples are in [docs/examples](docs/examples).
 
 Package `logic` holds the drivers and the capture types. `Open` opens an
 analyser by name, `Validate` checks a `Config` without opening one, and
-`Write` writes a `Trace` as JSON, CSV, or VCD.
+`Write` writes a `Trace` as JSON, CSV, or VCD. `Read` reads the JSON back.
 
 ## Tests
 
