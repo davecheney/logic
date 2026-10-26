@@ -2,6 +2,7 @@ package logic
 
 import (
 	"fmt"
+	"iter"
 	"slices"
 	"strconv"
 	syncatomic "sync/atomic"
@@ -127,27 +128,60 @@ type Relation struct {
 	Kind RelationKind
 }
 
-// CapabilitySet is the resources of one or more analysers and the
-// relations between them.
-type CapabilitySet struct {
-	Resources []Resource
-	Relations []Relation
+// SampleLimit gives the maximum sample count for a number of enabled inputs.
+type SampleLimit struct {
+	InputCount int
+	MaxSamples int
 }
 
-// Resource returns the resource with the given ID.
-func (s CapabilitySet) Resource(id ResourceID) (Resource, bool) {
-	for _, r := range s.Resources {
-		if r.ID == id {
-			return r, true
+// CapabilitySet describes analyser resources, their relations, and capture
+// limits.
+type CapabilitySet struct {
+	resources    []Resource
+	relations    []Relation
+	sampleLimits []SampleLimit
+}
+
+// Resources returns an iterator over the resources in the capability set.
+func (s *CapabilitySet) Resources() iter.Seq[Resource] {
+	return slices.Values(s.resources)
+}
+
+// Relations returns an iterator over the relations between resources.
+func (s *CapabilitySet) Relations() iter.Seq[Relation] {
+	return slices.Values(s.relations)
+}
+
+// SampleLimits returns an iterator over the reported sample limits.
+func (s *CapabilitySet) SampleLimits() iter.Seq[SampleLimit] {
+	return slices.Values(s.sampleLimits)
+}
+
+// Resource returns the resource with the given ID, or nil if it is not present.
+func (s *CapabilitySet) Resource(id ResourceID) *Resource {
+	i := slices.IndexFunc(s.resources, func(r Resource) bool {
+		return r.ID == id
+	})
+	if i < 0 {
+		return nil
+	}
+	return &s.resources[i]
+}
+
+// MaxSamplesFor returns the maximum sample count for inputs, when reported.
+func (s *CapabilitySet) MaxSamplesFor(inputs int) (int, bool) {
+	for limit := range s.SampleLimits() {
+		if limit.InputCount == inputs {
+			return limit.MaxSamples, true
 		}
 	}
-	return Resource{}, false
+	return 0, false
 }
 
 // HasRelation reports whether a and b have a relation of the given kind,
 // in either order.
-func (s CapabilitySet) HasRelation(a, b ResourceID, kind RelationKind) bool {
-	for _, r := range s.Relations {
+func (s *CapabilitySet) HasRelation(a, b ResourceID, kind RelationKind) bool {
+	for r := range s.Relations() {
 		if r.Kind == kind && (r.A == a && r.B == b || r.A == b && r.B == a) {
 			return true
 		}

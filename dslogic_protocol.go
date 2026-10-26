@@ -109,7 +109,7 @@ func DSLogicMaxSamples(inputs int) int { return depth(inputs) }
 
 // plan checks c and builds the hardware setting. It follows dsl_fpga_arm
 // in DSView libsigrok4DSL/hardware/DSL/dsl.c for buffer mode.
-func dslogicPlan(c Config) (*capture, error) {
+func dslogicPlan(c logicConfig) (*capture, error) {
 	n := bits.OnesCount16(c.Channels)
 	switch {
 	case c.Channels == 0:

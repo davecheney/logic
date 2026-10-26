@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-// Config selects the digital inputs to capture. Bit n of Channels is input Ln.
-type Config struct {
+// logicConfig is the driver-specific view of a digital capture request.
+type logicConfig struct {
 	Channels   uint16
 	Rate       Frequency // requested sample rate; rounded to a device clock step
 	Samples    int
@@ -18,6 +18,26 @@ type Config struct {
 	Falling    bool
 	PreTrigger float64       // fraction of samples before the trigger
 	Auto       time.Duration // zero waits for a trigger; otherwise permits an auto trace
+}
+
+// CaptureRequest selects digital resources for one capture.
+type CaptureRequest struct {
+	Inputs     []ResourceID
+	Trigger    ResourceID
+	Rate       Frequency
+	Samples    int
+	Falling    bool
+	PreTrigger float64
+	Auto       time.Duration
+}
+
+// OutputRequest selects an output resource and its requested signal.
+type OutputRequest struct {
+	Resource  ResourceID
+	Kind      ResourceKind
+	Enable    bool
+	Frequency Frequency
+	Waveform  Waveform
 }
 
 // Trace holds packed samples. Bit n of a sample is the state of Ln.
@@ -56,7 +76,8 @@ func (t *Trace) At(i int) uint16 {
 type Analyzer interface {
 	fmt.Stringer
 	Capabilities() CapabilitySet
-	ValidateLogic(Config) error
-	CaptureLogic(context.Context, Config) (*Trace, error)
+	ValidateCapture(CaptureRequest) error
+	CaptureLogic(context.Context, CaptureRequest) (*Trace, error)
+	ConfigureAWG(OutputRequest) (Frequency, error)
 	Close() error
 }

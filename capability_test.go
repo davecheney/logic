@@ -19,6 +19,36 @@ func TestResourceKindHas(t *testing.T) {
 	}
 }
 
+func TestCapabilityResources(t *testing.T) {
+	caps := bitscopeCapabilities(newDevice(ClassBitScope))
+	for range caps.Resources() {
+		break
+	}
+	for range 2 {
+		count := 0
+		for r := range caps.Resources() {
+			if r.ID != caps.resources[count].ID {
+				t.Fatalf("resource %d: got %+v, want %+v", count, r.ID, caps.resources[count].ID)
+			}
+			count++
+		}
+		if count != len(caps.resources) {
+			t.Fatalf("got %d resources, want %d", count, len(caps.resources))
+		}
+	}
+}
+
+func TestCapabilityResourceLookup(t *testing.T) {
+	dev := newDevice(ClassBitScope)
+	caps := bitscopeCapabilities(dev)
+	if r := caps.Resource(caps.resources[0].ID); r == nil || r.Name != "L0" {
+		t.Fatalf("Resource(L0) = %v", r)
+	}
+	if r := caps.Resource(dev.resourceID(KindDigitalIn, 15)); r != nil {
+		t.Fatalf("Resource(unknown) = %v, want nil", r)
+	}
+}
+
 var capabilityTables = []struct {
 	class DeviceClass
 	table func(*device) CapabilitySet
@@ -33,12 +63,12 @@ func TestCapabilityInvariants(t *testing.T) {
 		t.Run(tc.class.String(), func(t *testing.T) {
 			dev := newDevice(tc.class)
 			s := tc.table(dev)
-			if len(s.Resources) == 0 {
+			if len(s.resources) == 0 {
 				t.Fatal("no resources")
 			}
 			ids := map[ResourceID]bool{}
 			physical := map[PhysicalPin]ResourceID{}
-			for _, r := range s.Resources {
+			for r := range s.Resources() {
 				switch {
 				case ids[r.ID]:
 					t.Errorf("%s: duplicate ID %+v", r.Name, r.ID)
@@ -67,10 +97,10 @@ func TestCapabilityInvariants(t *testing.T) {
 				}
 				physical[r.Physical] = r.ID
 			}
-			for _, rel := range s.Relations {
-				a, okA := s.Resource(rel.A)
-				b, okB := s.Resource(rel.B)
-				if !okA || !okB {
+			for rel := range s.Relations() {
+				a := s.Resource(rel.A)
+				b := s.Resource(rel.B)
+				if a == nil || b == nil {
 					t.Errorf("relation %+v names an unknown resource", rel)
 				} else if rel.Kind == RelationAlias && a.Physical != b.Physical {
 					t.Errorf("alias %s and %s use different pins", a.Name, b.Name)
@@ -83,16 +113,16 @@ func TestCapabilityInvariants(t *testing.T) {
 func TestCapabilityDevices(t *testing.T) {
 	for _, tc := range capabilityTables {
 		a, b := tc.table(newDevice(tc.class)), tc.table(newDevice(tc.class))
-		for i := range a.Resources {
-			ra, rb := a.Resources[i].ID, b.Resources[i].ID
+		for i := range a.resources {
+			ra, rb := a.resources[i].ID, b.resources[i].ID
 			if ra == rb || ra.Device().Class() != rb.Device().Class() || ra.Kind() != rb.Kind() || ra.Index() != rb.Index() {
 				t.Errorf("%v: IDs %+v and %+v", tc.class, ra, rb)
 			}
 		}
 		// Each resource has its own rate list.
-		if len(a.Resources[0].Rates) > 0 {
-			a.Resources[0].Rates[0] = 0
-			if a.Resources[1].Rates[0] == 0 || b.Resources[0].Rates[0] == 0 {
+		if len(a.resources[0].Rates) > 0 {
+			a.resources[0].Rates[0] = 0
+			if a.resources[1].Rates[0] == 0 || b.resources[0].Rates[0] == 0 {
 				t.Errorf("%v: resources share a rate list", tc.class)
 			}
 		}
@@ -106,7 +136,8 @@ func TestCapabilityDevices(t *testing.T) {
 		{newDevice(ClassFX2), func(d *device) Analyzer { return &FX2{device: d} }},
 	} {
 		a := tc.analyzer(tc.dev)
-		for _, r := range a.Capabilities().Resources {
+		caps := a.Capabilities()
+		for r := range caps.Resources() {
 			if r.ID.Device() != tc.dev || r.ID.Device().Class() != tc.dev.class {
 				t.Fatalf("%T: resource %s has ID %+v, want device %+v", a, r.Name, r.ID, tc.dev)
 			}
@@ -129,7 +160,8 @@ func TestCapabilityPinNamespace(t *testing.T) {
 	for _, tc := range capabilityTables {
 		for range 2 {
 			dev := newDevice(tc.class)
-			for _, r := range tc.table(dev).Resources {
+			caps := tc.table(dev)
+			for r := range caps.Resources() {
 				if r.Physical.Device().Class() != dev.class || r.Physical.Device() != dev {
 					t.Errorf("%v %s: pin %v, want class %v device %d", tc.class, r.Name, r.Physical, dev.class, dev.id)
 				}
@@ -155,18 +187,18 @@ func TestCapabilityPinNamespace(t *testing.T) {
 func TestBitScopeCapabilities(t *testing.T) {
 	s := bitscopeCapabilities(newDevice(ClassBitScope))
 	var l4, awg ResourceID
-	for _, r := range s.Resources {
+	for r := range s.Resources() {
 		switch {
 		case r.Kind.Has(KindDigitalIn):
 			// The suggested rates are exact; MinHz and MaxHz are the limits.
 			for _, rate := range r.Rates {
-				ticks, _, _, err := bitscopeLogicPlan(Config{Channels: 1, Rate: rate, Samples: 32})
+				ticks, _, _, err := bitscopeLogicPlan(logicConfig{Channels: 1, Rate: rate, Samples: 32})
 				if err != nil || frequencyFromHz(clockRate/float64(ticks)) != rate {
 					t.Errorf("%s: rate %v: ticks %d, err %v", r.Name, rate, ticks, err)
 				}
 			}
 			for rate, ok := range map[Frequency]bool{r.MinHz: true, r.MaxHz: true, r.MinHz - 1: false, r.MaxHz + 1: false} {
-				if err := (&BitScope{}).ValidateLogic(Config{Channels: 1, Rate: rate, Samples: 32}); (err == nil) != ok {
+				if err := (&BitScope{}).validateLogic(logicConfig{Channels: 1, Rate: rate, Samples: 32}); (err == nil) != ok {
 					t.Errorf("%s: rate %v: err %v", r.Name, rate, err)
 				}
 			}
@@ -193,34 +225,34 @@ func TestBitScopeCapabilities(t *testing.T) {
 
 func TestDSLogicCapabilities(t *testing.T) {
 	s := dslogicCapabilities(newDevice(ClassDSLogic))
-	if len(s.Resources) != 16 {
-		t.Fatalf("%d resources, want 16", len(s.Resources))
+	if len(s.resources) != 16 {
+		t.Fatalf("%d resources, want 16", len(s.resources))
 	}
-	r := s.Resources[0]
+	r := s.resources[0]
 	if r.MinHz != r.Rates[len(r.Rates)-1] {
 		t.Errorf("last rate %v, want MinHz %v", r.Rates[len(r.Rates)-1], r.MinHz)
 	}
 	for _, rate := range r.Rates {
-		p, err := dslogicPlan(Config{Channels: 1, Rate: rate, Samples: 4096})
+		p, err := dslogicPlan(logicConfig{Channels: 1, Rate: rate, Samples: 4096})
 		if err != nil || frequencyFromHz(p.rate) != rate {
 			t.Errorf("rate %v: err %v", rate, err)
 		}
 	}
 	for _, rate := range []Frequency{r.MinHz - 1, r.MaxHz + 1} {
-		if _, err := dslogicPlan(Config{Channels: 1, Rate: rate, Samples: 4096}); err == nil {
+		if _, err := dslogicPlan(logicConfig{Channels: 1, Rate: rate, Samples: 4096}); err == nil {
 			t.Errorf("rate %v: no error", rate)
 		}
 	}
 	// Every input shows the 400 MHz maximum. The driver rejects inputs
 	// that the fast modes cannot use.
-	for _, c := range []Config{
+	for _, c := range []logicConfig{
 		{Channels: 1 << 4, Rate: 400 * MegaHertz, Source: 4, Samples: 4096},
 		{Channels: 1 << 8, Rate: 200 * MegaHertz, Source: 8, Samples: 4096},
 	} {
-		if s.Resources[c.Source].MaxHz < c.Rate {
-			t.Errorf("L%d: MaxHz %v", c.Source, s.Resources[c.Source].MaxHz)
+		if s.resources[c.Source].MaxHz < c.Rate {
+			t.Errorf("L%d: MaxHz %v", c.Source, s.resources[c.Source].MaxHz)
 		}
-		if err := (&DSLogic{}).ValidateLogic(c); err == nil {
+		if err := (&DSLogic{}).validateLogic(c); err == nil {
 			t.Errorf("L%d at %v: no error", c.Source, c.Rate)
 		}
 	}
@@ -228,10 +260,10 @@ func TestDSLogicCapabilities(t *testing.T) {
 
 func TestFX2Capabilities(t *testing.T) {
 	s := fx2Capabilities(newDevice(ClassFX2))
-	if len(s.Resources) != 8 {
-		t.Fatalf("%d resources, want 8", len(s.Resources))
+	if len(s.resources) != 8 {
+		t.Fatalf("%d resources, want 8", len(s.resources))
 	}
-	r := s.Resources[0]
+	r := s.resources[0]
 	if r.MinHz != 20*KiloHertz || r.MaxHz != 24*MegaHertz {
 		t.Fatalf("range %v to %v", r.MinHz, r.MaxHz)
 	}
@@ -244,8 +276,56 @@ func TestFX2Capabilities(t *testing.T) {
 		if !slices.Contains(fx2Rates, rate) {
 			t.Errorf("rate %v is not a firmware rate", rate)
 		}
-		if err := (&FX2{}).ValidateLogic(Config{Channels: 1, Rate: rate, Samples: 2}); err != nil {
+		if err := (&FX2{}).validateLogic(logicConfig{Channels: 1, Rate: rate, Samples: 2}); err != nil {
 			t.Errorf("rate %v: %v", rate, err)
 		}
+	}
+}
+
+func TestCapabilitySampleLimitsIterator(t *testing.T) {
+	for _, tc := range capabilityTables {
+		t.Run(tc.class.String(), func(t *testing.T) {
+			caps := tc.table(newDevice(tc.class))
+			for range caps.SampleLimits() {
+				break
+			}
+			for range 2 {
+				got := slices.Collect(caps.SampleLimits())
+				if !slices.Equal(got, caps.sampleLimits) {
+					t.Fatalf("SampleLimits() = %v, want %v", got, caps.sampleLimits)
+				}
+			}
+		})
+	}
+	var caps CapabilitySet
+	if got := slices.Collect(caps.SampleLimits()); len(got) != 0 {
+		t.Fatalf("empty SampleLimits() = %v", got)
+	}
+}
+
+func TestCapabilitySampleLimits(t *testing.T) {
+	tests := []struct {
+		name       string
+		caps       CapabilitySet
+		inputs     int
+		want       int
+		wantExists bool
+	}{
+		{"BitScope one input", bitscopeCapabilities(newDevice(ClassBitScope)), 1, 12288, true},
+		{"BitScope six inputs", bitscopeCapabilities(newDevice(ClassBitScope)), 6, 12288, true},
+		{"BitScope seven inputs", bitscopeCapabilities(newDevice(ClassBitScope)), 7, 0, false},
+		{"DSLogic four inputs", dslogicCapabilities(newDevice(ClassDSLogic)), 4, 67_108_864, true},
+		{"DSLogic sixteen inputs", dslogicCapabilities(newDevice(ClassDSLogic)), 16, 16_777_216, true},
+		{"DSLogic no inputs", dslogicCapabilities(newDevice(ClassDSLogic)), 0, 0, false},
+		{"FX2 has no reported limit", fx2Capabilities(newDevice(ClassFX2)), 8, 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := tt.caps.MaxSamplesFor(tt.inputs)
+			if got != tt.want || ok != tt.wantExists {
+				t.Fatalf("MaxSamplesFor(%d) = %d, %t; want %d, %t",
+					tt.inputs, got, ok, tt.want, tt.wantExists)
+			}
+		})
 	}
 }

@@ -14,12 +14,12 @@ import (
 	"time"
 )
 
-func logicConfig() Config {
-	return Config{Channels: 3, Rate: 4 * MegaHertz, Samples: 12000, Source: 1, PreTrigger: 0.05}
+func validLogicConfig() logicConfig {
+	return logicConfig{Channels: 3, Rate: 4 * MegaHertz, Samples: 12000, Source: 1, PreTrigger: 0.05}
 }
 
 func TestLogicPlan(t *testing.T) {
-	c := logicConfig()
+	c := validLogicConfig()
 	ticks, trigger, timeout, err := bitscopeLogicPlan(c)
 	if err != nil || ticks != 10 || trigger != 600 || timeout != 0 {
 		t.Fatalf("plan: %d %d %d %v", ticks, trigger, timeout, err)
@@ -34,28 +34,28 @@ func TestLogicPlan(t *testing.T) {
 			t.Fatalf("rate %v: ticks=%d %v", rate, ticks, err)
 		}
 	}
-	for name, change := range map[string]func(*Config){
-		"empty channels": func(c *Config) { c.Channels = 0 },
-		"analog bit":     func(c *Config) { c.Channels = 0x80 },
-		"source off":     func(c *Config) { c.Source = 2 },
-		"source low":     func(c *Config) { c.Source = -1 },
-		"source high":    func(c *Config) { c.Source = 6 },
-		"rate low":       func(c *Config) { c.Rate = 2441 * Hertz },
-		"rate high":      func(c *Config) { c.Rate = 8*MegaHertz + 1 },
-		"rate zero":      func(c *Config) { c.Rate = 0 },
-		"few samples":    func(c *Config) { c.Samples = 31 },
-		"buffer":         func(c *Config) { c.Samples = 12289 },
-		"pre negative":   func(c *Config) { c.PreTrigger = -0.1 },
-		"pre high":       func(c *Config) { c.PreTrigger = 1.1 },
-		"pre nan":        func(c *Config) { c.PreTrigger = math.NaN() },
-		"pre fast":       func(c *Config) { c.Rate = 8 * MegaHertz },
-		"auto negative":  func(c *Config) { c.Auto = -time.Second },
-		"auto overflow":  func(c *Config) { c.Auto = time.Second },
+	for name, change := range map[string]func(*logicConfig){
+		"empty channels": func(c *logicConfig) { c.Channels = 0 },
+		"analog bit":     func(c *logicConfig) { c.Channels = 0x80 },
+		"source off":     func(c *logicConfig) { c.Source = 2 },
+		"source low":     func(c *logicConfig) { c.Source = -1 },
+		"source high":    func(c *logicConfig) { c.Source = 6 },
+		"rate low":       func(c *logicConfig) { c.Rate = 2441 * Hertz },
+		"rate high":      func(c *logicConfig) { c.Rate = 8*MegaHertz + 1 },
+		"rate zero":      func(c *logicConfig) { c.Rate = 0 },
+		"few samples":    func(c *logicConfig) { c.Samples = 31 },
+		"buffer":         func(c *logicConfig) { c.Samples = 12289 },
+		"pre negative":   func(c *logicConfig) { c.PreTrigger = -0.1 },
+		"pre high":       func(c *logicConfig) { c.PreTrigger = 1.1 },
+		"pre nan":        func(c *logicConfig) { c.PreTrigger = math.NaN() },
+		"pre fast":       func(c *logicConfig) { c.Rate = 8 * MegaHertz },
+		"auto negative":  func(c *logicConfig) { c.Auto = -time.Second },
+		"auto overflow":  func(c *logicConfig) { c.Auto = time.Second },
 	} {
 		t.Run(name, func(t *testing.T) {
-			c := logicConfig()
+			c := validLogicConfig()
 			change(&c)
-			if (&BitScope{}).ValidateLogic(c) == nil {
+			if (&BitScope{}).validateLogic(c) == nil {
 				t.Fatal("invalid config accepted")
 			}
 		})
@@ -65,7 +65,7 @@ func TestLogicPlan(t *testing.T) {
 func TestLogicCapture(t *testing.T) {
 	for _, chunk := range []int{1, 3, 4096} {
 		for _, status := range []string{"00", "01"} {
-			c := logicConfig()
+			c := validLogicConfig()
 			c.Samples = 32
 			c.Falling = true
 			raw := bytes.Repeat([]byte{0, 1, 2, 0xff}, 8)
@@ -82,7 +82,7 @@ func TestLogicCapture(t *testing.T) {
 				}
 			}}
 			s := &BitScope{name: "BS000500", vm: vm{port: p, timeout: time.Second}}
-			tr, err := s.CaptureLogic(context.Background(), c)
+			tr, err := s.captureLogic(context.Background(), c)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -122,7 +122,7 @@ func TestLogicCaptureRate(t *testing.T) {
 		{7 * MegaHertz, 6_666_666_667 * MilliHertz},
 		{2_441_407 * MilliHertz, 2_441_406 * MilliHertz},
 	} {
-		c := logicConfig()
+		c := validLogicConfig()
 		c.Rate, c.Samples, c.PreTrigger = tc.rate, 32, 0
 		p := &testPort{reply: func(cmd string) string {
 			switch cmd {
@@ -137,7 +137,7 @@ func TestLogicCaptureRate(t *testing.T) {
 			}
 		}}
 		s := &BitScope{vm: vm{port: p, timeout: time.Second}}
-		tr, err := s.CaptureLogic(context.Background(), c)
+		tr, err := s.captureLogic(context.Background(), c)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -148,22 +148,22 @@ func TestLogicCaptureRate(t *testing.T) {
 }
 
 func TestLogicCaptureErrors(t *testing.T) {
-	c := logicConfig()
+	c := validLogicConfig()
 	c.Channels, c.Source = 0x10, 4
 	p := &testPort{reply: func(cmd string) string { return cmd + "\r40\r" }}
 	s := &BitScope{vm: vm{port: p, timeout: time.Millisecond}}
-	if _, err := s.CaptureLogic(context.Background(), c); err == nil {
+	if _, err := s.captureLogic(context.Background(), c); err == nil {
 		t.Fatal("AWG pin conflict was accepted")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := s.CaptureLogic(ctx, logicConfig()); !errors.Is(err, context.Canceled) {
+	if _, err := s.captureLogic(ctx, validLogicConfig()); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled context: %v", err)
 	}
-	c = logicConfig()
+	c = validLogicConfig()
 	c.Channels = 0
 	p.wrote.Reset()
-	if _, err := s.CaptureLogic(context.Background(), c); err == nil || p.wrote.Len() != 0 {
+	if _, err := s.captureLogic(context.Background(), c); err == nil || p.wrote.Len() != 0 {
 		t.Fatal("invalid configuration accessed device")
 	}
 }
@@ -184,7 +184,7 @@ func TestLogicCancellation(t *testing.T) {
 	s := &BitScope{name: "BS000500", vm: vm{port: p, timeout: time.Second}}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
 	defer cancel()
-	if _, err := s.CaptureLogic(ctx, logicConfig()); !errors.Is(err, context.DeadlineExceeded) {
+	if _, err := s.captureLogic(ctx, validLogicConfig()); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("cancel logic trace: %v", err)
 	}
 	if !strings.HasSuffix(p.wrote.String(), "K?") || strings.Contains(p.wrote.String(), "!") {
@@ -259,12 +259,12 @@ func TestLogicDevice(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer dev.Close()
-	c := logicConfig()
+	c := validLogicConfig()
 	c.Channels = 0x3f
 	c.Auto = 50 * time.Millisecond
 	for range 5 {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		tr, err := dev.CaptureLogic(ctx, c)
+		tr, err := dev.CaptureLogic(ctx, captureRequestForTest(dev, c))
 		cancel()
 		if err != nil {
 			t.Fatal(err)

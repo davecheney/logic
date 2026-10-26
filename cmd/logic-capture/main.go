@@ -7,14 +7,26 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"iter"
 	"math/bits"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/davecheney/logic"
 )
+
+type captureOptions struct {
+	ChannelMask uint
+	Rate        logic.Frequency
+	Samples     int
+	Source      int
+	Falling     bool
+	PreTrigger  float64
+	Auto        time.Duration
+}
 
 func run(args []string, stdout, stderr io.Writer) (err error) {
 	flags := flag.NewFlagSet("logic-capture", flag.ContinueOnError)
@@ -23,12 +35,12 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	port := flags.String("port", "", "BitScope serial port (default: search)")
 	threshold := flags.String("threshold", "3.3", "DSLogic input threshold: 3.3 or 5 (volts)")
 	rate := 4 * logic.MegaHertz
-	flags.Func("rate", "sample rate, such as 4MHz or 4000000 (Hz): BitScope at most 8MHz, DSLogic at most 400MHz, FX2 at most 24MHz (default 4MHz)", func(s string) (err error) {
+	flags.Func("rate", "sample rate, such as 4MHz or 4000000 (Hz); supported rates depend on the analyser (default 4MHz)", func(s string) (err error) {
 		rate, err = logic.ParseFrequency(s)
 		return err
 	})
-	samples := flags.Int("samples", 12000, "sample count: BitScope at most 12288")
-	channels := flags.Uint("channels", 3, "input bit mask: bit n is Ln; BitScope L0 to L5, DSLogic L0 to L15, FX2 L0 to L7")
+	samples := flags.Int("samples", 12000, "number of samples; limits depend on the analyser and selected inputs")
+	channels := flags.Uint("channels", 3, "digital input bit mask; bit n selects input n")
 	source := flags.Int("trigger", 1, "trigger input number")
 	falling := flags.Bool("falling", false, "trigger on a falling edge")
 	pre := flags.Float64("pre", 0.05, "fraction of samples before the trigger")
@@ -43,11 +55,8 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	if flags.NArg() != 0 {
 		return errors.New("unexpected arguments")
 	}
-	if *channels > 0xffff {
-		return errors.New("channels must be a 16-bit mask")
-	}
-	cfg := logic.Config{
-		Channels: uint16(*channels), Rate: rate, Samples: *samples,
+	cfg := captureOptions{
+		ChannelMask: *channels, Rate: rate, Samples: *samples,
 		Source: *source, Falling: *falling, PreTrigger: *pre, Auto: *auto,
 	}
 	set := map[string]bool{}
@@ -64,7 +73,15 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	default:
 		return errors.New("threshold must be 3.3 or 5")
 	}
-	if err := logic.Validate(*device, cfg); err != nil {
+	caps, err := logic.CapabilitiesFor(*device)
+	if err != nil {
+		return err
+	}
+	req, err := captureRequest(&caps, cfg)
+	if err != nil {
+		return err
+	}
+	if err := logic.Validate(*device, req); err != nil {
 		return err
 	}
 	if *format != "csv" && *format != "json" && *format != "vcd" {
@@ -85,6 +102,14 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, dev.Close()) }()
+	caps = dev.Capabilities()
+	req, err = captureRequest(&caps, cfg)
+	if err != nil {
+		return err
+	}
+	if err := dev.ValidateCapture(req); err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	if *wait > 0 {
@@ -93,7 +118,7 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 		defer cancel()
 	}
 	fmt.Fprintf(stderr, "%s: starting capture, trigger L%d; output %s\n", dev, cfg.Source, *output)
-	tr, err := dev.CaptureLogic(ctx, cfg)
+	tr, err := dev.CaptureLogic(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -110,9 +135,83 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	return logic.Write(stdout, *format, tr)
 }
 
+type resourceCapabilities interface {
+	Resources() iter.Seq[logic.Resource]
+}
+
+func captureRequest(caps resourceCapabilities, options captureOptions) (logic.CaptureRequest, error) {
+	req := logic.CaptureRequest{
+		Rate: options.Rate, Samples: options.Samples, Falling: options.Falling,
+		PreTrigger: options.PreTrigger, Auto: options.Auto,
+	}
+	selectedInputs := make(map[uint]logic.ResourceID)
+	otherResources := make(map[uint]logic.Resource)
+	triggerFound := false
+	for r := range caps.Resources() {
+		index := r.ID.Index()
+		if index >= uint(bits.UintSize) {
+			continue
+		}
+		bit := uint(1) << index
+		if r.Kind.Has(logic.KindDigitalIn) {
+			if options.ChannelMask&bit != 0 {
+				selectedInputs[index] = r.ID
+			}
+			if int(index) == options.Source {
+				req.Trigger = r.ID
+				triggerFound = true
+			}
+		} else if options.ChannelMask&bit != 0 || int(index) == options.Source {
+			otherResources[index] = r
+		}
+	}
+	for index := uint(0); index < uint(bits.UintSize); index++ {
+		if options.ChannelMask&(uint(1)<<index) == 0 {
+			continue
+		}
+		if _, ok := selectedInputs[index]; !ok {
+			if other, exists := otherResources[index]; exists {
+				return logic.CaptureRequest{}, fmt.Errorf("requested resource %q is not a digital input", other.Name)
+			}
+			return logic.CaptureRequest{}, fmt.Errorf("digital input L%d is not available", index)
+		}
+	}
+	if options.Source < 0 || options.Source >= bits.UintSize {
+		return logic.CaptureRequest{}, fmt.Errorf("trigger input %d is out of range", options.Source)
+	}
+	if !triggerFound {
+		if other, ok := otherResources[uint(options.Source)]; ok {
+			return logic.CaptureRequest{}, fmt.Errorf("requested resource %q is not a digital input", other.Name)
+		}
+		return logic.CaptureRequest{}, fmt.Errorf("trigger input L%d is not available", options.Source)
+	}
+	req.Inputs = slices.Collect(filterMap(
+		caps.Resources(),
+		func(r logic.Resource) bool {
+			selected, ok := selectedInputs[r.ID.Index()]
+			return ok && selected == r.ID && r.Kind.Has(logic.KindDigitalIn)
+		},
+		func(r logic.Resource) logic.ResourceID { return r.ID },
+	))
+	if len(req.Inputs) == 0 {
+		return logic.CaptureRequest{}, errors.New("at least one input must be selected")
+	}
+	return req, nil
+}
+
+func filterMap[T, U any](seq iter.Seq[T], keep func(T) bool, mapValue func(T) U) iter.Seq[U] {
+	return func(yield func(U) bool) {
+		for value := range seq {
+			if keep(value) && !yield(mapValue(value)) {
+				return
+			}
+		}
+	}
+}
+
 // applyPreset sets the options of a preset that are not in set, the flags
 // given on the command line.
-func applyPreset(name string, set map[string]bool, device string, cfg *logic.Config, wait *time.Duration) error {
+func applyPreset(name string, set map[string]bool, device string, cfg *captureOptions, wait *time.Duration) error {
 	switch name {
 	case "":
 		return nil
@@ -124,13 +223,21 @@ func applyPreset(name string, set map[string]bool, device string, cfg *logic.Con
 		return errors.New("the long preset needs -device dslogic")
 	}
 	if !set["channels"] {
-		cfg.Channels = 0x000f
+		cfg.ChannelMask = 0x000f
 	}
 	if !set["rate"] {
 		cfg.Rate = logic.MegaHertz
 	}
 	if !set["samples"] {
-		cfg.Samples = min(int(60*cfg.Rate/logic.Hertz), logic.DSLogicMaxSamples(bits.OnesCount16(cfg.Channels)))
+		caps, err := logic.CapabilitiesFor(device)
+		if err != nil {
+			return err
+		}
+		maxSamples, ok := caps.MaxSamplesFor(bits.OnesCount(cfg.ChannelMask))
+		if !ok {
+			return fmt.Errorf("%s: no sample limit for %d inputs", device, bits.OnesCount(cfg.ChannelMask))
+		}
+		cfg.Samples = min(int(60*cfg.Rate/logic.Hertz), maxSamples)
 	}
 	if !set["wait"] {
 		capture := time.Duration(float64(cfg.Samples) / cfg.Rate.Hz() * float64(time.Second))

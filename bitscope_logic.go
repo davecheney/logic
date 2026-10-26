@@ -31,7 +31,7 @@ func (s *BitScope) Capabilities() CapabilitySet { return bitscopeCapabilities(s.
 
 func bitscopeCapabilities(dev *device) CapabilitySet {
 	// The slowest logic rate is 40 MHz / 16384 ticks; round it up so that
-	// ValidateLogic accepts it.
+	// validateLogic accepts it.
 	clockRateMilliHz := Frequency(clockRate) * Hertz
 	minLogic := (clockRateMilliHz + 16384 - 1) / 16384
 	rs := digitalInputs(dev, 6, minLogic, 8*MegaHertz, bitscopeLogicRates)
@@ -57,9 +57,14 @@ func bitscopeCapabilities(dev *device) CapabilitySet {
 	}
 	rs = append(rs, awg)
 	l4 := rs[4].ID
+	sampleLimits := make([]SampleLimit, 6)
+	for i := range sampleLimits {
+		sampleLimits[i] = SampleLimit{InputCount: i + 1, MaxSamples: bufferSize}
+	}
 	return CapabilitySet{
-		Resources: rs,
-		Relations: []Relation{
+		resources:    rs,
+		sampleLimits: sampleLimits,
+		relations: []Relation{
 			{A: l4, B: awg.ID, Kind: RelationAlias},
 			{A: l4, B: awg.ID, Kind: RelationConflict},
 		},
@@ -87,13 +92,21 @@ func scopeRateRange() (min, max Frequency) {
 	return min, max
 }
 
-// ValidateLogic checks a logic configuration without accessing the device.
-func (s *BitScope) ValidateLogic(c Config) error {
+// ValidateCapture checks a typed capture request without accessing the device.
+func (s *BitScope) ValidateCapture(req CaptureRequest) error {
+	c, err := captureConfig(s.device, s.Capabilities(), req)
+	if err != nil {
+		return err
+	}
+	return s.validateLogic(c)
+}
+
+func (s *BitScope) validateLogic(c logicConfig) error {
 	_, _, _, err := bitscopeLogicPlan(c)
 	return err
 }
 
-func bitscopeLogicPlan(c Config) (ticks, trigger, timeout int, err error) {
+func bitscopeLogicPlan(c logicConfig) (ticks, trigger, timeout int, err error) {
 	switch {
 	case c.Channels == 0 || c.Channels&^0x3f != 0:
 		err = errors.New("bitscope: select inputs L0 through L5")
@@ -129,9 +142,17 @@ func bitscopeLogicPlan(c Config) (ticks, trigger, timeout int, err error) {
 	return
 }
 
-// CaptureLogic captures all enabled digital inputs at the same time.
+// CaptureLogic captures the requested digital inputs at the same time.
 // Do not call it during another capture or generator operation.
-func (s *BitScope) CaptureLogic(ctx context.Context, c Config) (*Trace, error) {
+func (s *BitScope) CaptureLogic(ctx context.Context, req CaptureRequest) (*Trace, error) {
+	c, err := captureConfig(s.device, s.Capabilities(), req)
+	if err != nil {
+		return nil, err
+	}
+	return s.captureLogic(ctx, c)
+}
+
+func (s *BitScope) captureLogic(ctx context.Context, c logicConfig) (*Trace, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
