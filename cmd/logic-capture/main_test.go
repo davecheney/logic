@@ -13,7 +13,7 @@ import (
 
 func TestInvalidOptions(t *testing.T) {
 	for _, args := range [][]string{
-		{}, {"-device", "saleae"},
+		{}, {"-device", "nosuch"},
 		{"-format", "xml"}, {"-channels", "256"}, {"-channels", "0"},
 		{"-rate", "NaN"}, {"-rate", "16000000"}, {"-samples", "16000"},
 		{"-trigger", "4"}, {"-wait", "-1s"}, {"unexpected"},

@@ -18,7 +18,8 @@ permit a capture without an edge. `-wait` is the total capture deadline.
 Do not use it to prove that an expected signal was absent after a trigger.
 
 The limits on rate, sample count, and pre-trigger depend on the analyser.
-See [bitscope.md](bitscope.md) and [dslogic.md](dslogic.md).
+See [bitscope.md](bitscope.md), [dslogic.md](dslogic.md), and
+[fx2lafw.md](fx2lafw.md).
 
 ## Output
 

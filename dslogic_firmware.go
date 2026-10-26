@@ -11,7 +11,7 @@ import _ "embed"
 
 var (
 	//go:embed dslogic_firmware/DSLogic.fw
-	fx2Firmware []byte
+	dslogicFirmware []byte
 	//go:embed dslogic_firmware/DSLogic33.bin
 	fpga33 []byte
 	//go:embed dslogic_firmware/DSLogic50.bin

@@ -12,7 +12,7 @@ func TestInvalidOptions(t *testing.T) {
 		want string
 	}{
 		{nil, "-device is required"},
-		{[]string{"-device", "saleae"}, "unknown device"},
+		{[]string{"-device", "nosuch"}, "unknown device"},
 		{[]string{"-device", "dslogic", "-threshold", "1.8"}, "threshold must be 3.3 or 5"},
 		{[]string{"-device", "bitscope", "-port", "/dev/null", "-baud", "fast"}, "bad baud rate"},
 		{[]string{"-device", "bitscope", "extra"}, "unexpected arguments"},

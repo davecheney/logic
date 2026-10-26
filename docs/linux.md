@@ -1,5 +1,21 @@
 # Linux permissions
 
+## Saleae Logic clone
+
+By default only root can open the Saleae Logic clone. Add a udev rule for
+its USB ID, 0925:3881:
+
+```sh
+echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="0925", ATTRS{idProduct}=="3881", MODE="0666"' | \
+  sudo tee /etc/udev/rules.d/60-saleae-clone.rules
+sudo udevadm control --reload
+sudo udevadm trigger
+```
+
+Then unplug the analyser and plug it in again. The rule also covers the
+device after the tools load its firmware, because the USB ID stays the
+same.
+
 ## DSLogic
 
 By default only root can open the DSLogic. Add a udev rule for its USB

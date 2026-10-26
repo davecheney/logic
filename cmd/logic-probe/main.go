@@ -58,6 +58,13 @@ func run(args []string, stdout, stderr io.Writer) error {
 			return errors.New("threshold must be 3.3 or 5")
 		}
 		return probeDSLogic(stdout, th)
+	case "fx2lafw", "saleae":
+		d, err := logic.OpenFX2()
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(stdout, d)
+		return d.Close()
 	case "":
 		return fmt.Errorf("-device is required: %s", strings.Join(logic.Devices(), ", "))
 	default:

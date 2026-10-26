@@ -32,6 +32,16 @@ var drivers = []driver{
 		open:     func(_ string, th Threshold) (Analyzer, error) { return OpenDSLogic(th) },
 		validate: (&DSLogic{}).ValidateLogic,
 	},
+	{
+		name:     "fx2lafw",
+		open:     func(_ string, _ Threshold) (Analyzer, error) { return OpenFX2() },
+		validate: (&FX2{}).ValidateLogic,
+	},
+	{
+		name:     "saleae",
+		open:     func(_ string, _ Threshold) (Analyzer, error) { return OpenFX2() },
+		validate: (&FX2{}).ValidateLogic,
+	},
 }
 
 // Devices returns the names that Open accepts.
