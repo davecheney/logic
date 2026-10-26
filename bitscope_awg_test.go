@@ -50,7 +50,7 @@ func TestAWGEnableCycles(t *testing.T) {
 			return cmd
 		}
 	}}
-	s := &BitScope{ID: "BS000500", vm: vm{port: p, timeout: time.Second}}
+	s := &BitScope{name: "BS000500", vm: vm{port: p, timeout: time.Second}}
 	for _, enabled := range []bool{false, true, false, true} {
 		if _, err := s.SetAWG(AWGConfig{Enabled: enabled, Frequency: 1000, Waveform: Sine}); err != nil {
 			t.Fatalf("enabled=%v: %v", enabled, err)

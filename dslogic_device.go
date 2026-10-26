@@ -44,6 +44,7 @@ func (t Threshold) String() string {
 type DSLogic struct {
 	ID        string
 	Threshold Threshold
+	device    *device
 	ctx       *gousb.Context
 	dev       *gousb.Device
 	cfg       *gousb.Config
@@ -65,7 +66,7 @@ func OpenDSLogic(t Threshold) (_ *DSLogic, err error) {
 	if err != nil {
 		return nil, err
 	}
-	d := &DSLogic{ctx: ctx, dev: dev}
+	d := &DSLogic{ctx: ctx, dev: dev, device: newDevice(ClassDSLogic)}
 	defer func() {
 		if err != nil {
 			d.closeUSB()
@@ -276,6 +277,24 @@ func (d *DSLogic) bulkOut(b []byte) error {
 
 // String returns the device ID.
 func (d *DSLogic) String() string { return d.ID }
+
+// dslogicRates are suggested sample rates: the 400 and 200 MHz modes,
+// then 100 MHz divided by a whole number.
+var dslogicRates = []Frequency{
+	400 * MegaHertz, 200 * MegaHertz, 100 * MegaHertz, 50 * MegaHertz,
+	25 * MegaHertz, 20 * MegaHertz, 10 * MegaHertz, 5 * MegaHertz,
+	2 * MegaHertz, 1 * MegaHertz, 500 * KiloHertz, 200 * KiloHertz,
+	100 * KiloHertz, 50 * KiloHertz,
+}
+
+// Capabilities returns the 16 inputs of the DSLogic. At 400 MHz only L0
+// to L3 work, and at 200 MHz only L0 to L7. The table does not show
+// this; ValidateLogic returns an error for those combinations.
+func (d *DSLogic) Capabilities() CapabilitySet { return dslogicCapabilities(d.device) }
+
+func dslogicCapabilities(dev *device) CapabilitySet {
+	return CapabilitySet{Resources: digitalInputs(dev, 16, minRate, quarterRate, dslogicRates)}
+}
 
 // ValidateLogic checks a logic configuration for the DSLogic.
 func (d *DSLogic) ValidateLogic(c Config) error {

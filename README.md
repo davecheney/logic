@@ -60,6 +60,15 @@ implements JSON encoding and decoding with the same unit notation as
 `String` and `ParseFrequency`. Old captures with a numeric
 `sample_rate_hz` field are not supported.
 
+`Analyzer.Capabilities` returns a `CapabilitySet`: the inputs and
+outputs of an open analyser, with their roles, rate limits, and a short
+list of suggested rates. Each driver holds a device object with its class and an instance ID that is unique in the process. Capability builders use that object to create resource and pin identities. `ResourceID` and `PhysicalPin` refer to the device object; use their `Device` method to read it, and `Device().Class()` for its class.
+A `PhysicalPin` is device class, device instance, and pin, so pin 0 on a BitScope is not pin 0 on a Saleae clone, or pin 0 on a second BitScope.
+Typed relations show pins that two resources share, such as BitScope L4
+and the AWG output. Some settings limit each other, for example the
+DSLogic channels at 200 and 400 MHz. The set does not show these limits;
+`ValidateLogic` returns an error for them.
+
 ## Tests
 
 ```sh

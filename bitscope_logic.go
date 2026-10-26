@@ -7,8 +7,85 @@ import (
 	"math"
 )
 
-// String returns the device ID.
-func (s *BitScope) String() string { return s.ID }
+// String returns the device name.
+func (s *BitScope) String() string { return s.Name() }
+
+// bitscopeLogicRates are suggested logic sample rates. Each is 40 MHz
+// divided by a whole number of ticks.
+var bitscopeLogicRates = []Frequency{
+	8 * MegaHertz, 5 * MegaHertz, 4 * MegaHertz, 2 * MegaHertz, 1 * MegaHertz,
+	500 * KiloHertz, 200 * KiloHertz, 100 * KiloHertz, 50 * KiloHertz,
+	20 * KiloHertz, 10 * KiloHertz, 5 * KiloHertz, 2500 * Hertz,
+}
+
+// BitScope pins: L0 to L5 are pins 0 to 5. The AWG output uses the L4 pin.
+const (
+	bitscopePinA   = 6
+	bitscopePinB   = 7
+	bitscopePinAWG = 4
+)
+
+// Capabilities returns the resources of the BitScope. L4 shares its pin
+// with the AWG output.
+func (s *BitScope) Capabilities() CapabilitySet { return bitscopeCapabilities(s.device) }
+
+func bitscopeCapabilities(dev *device) CapabilitySet {
+	// The slowest logic rate is 40 MHz / 16384 ticks; round it up so that
+	// ValidateLogic accepts it.
+	clockRateMilliHz := Frequency(clockRate) * Hertz
+	minLogic := (clockRateMilliHz + 16384 - 1) / 16384
+	rs := digitalInputs(dev, 6, minLogic, 8*MegaHertz, bitscopeLogicRates)
+	minAnalog, maxAnalog := scopeRateRange()
+	for i, name := range []string{"A", "B"} {
+		rs = append(rs, Resource{
+			ID:       dev.resourceID(KindAnalogIn, uint(i)),
+			Physical: dev.physicalPin(bitscopePinA + uint(i)),
+			Kind:     KindAnalogIn | KindTrigger,
+			Name:     name,
+			MinHz:    minAnalog,
+			MaxHz:    maxAnalog,
+		})
+	}
+	awg := Resource{
+		ID:        dev.resourceID(KindAWG, 0),
+		Physical:  dev.physicalPin(bitscopePinAWG),
+		Kind:      KindAWG,
+		Name:      "awg0",
+		MinHz:     10 * Hertz,
+		MaxHz:     10 * KiloHertz,
+		Waveforms: []Waveform{Sine, Square, Triangle, Saw},
+	}
+	rs = append(rs, awg)
+	l4 := rs[4].ID
+	return CapabilitySet{
+		Resources: rs,
+		Relations: []Relation{
+			{A: l4, B: awg.ID, Kind: RelationAlias},
+			{A: l4, B: awg.ID, Kind: RelationConflict},
+		},
+	}
+}
+
+// scopeRateRange returns the slowest and fastest analog sample rates for
+// one channel in the trace modes.
+func scopeRateRange() (min, max Frequency) {
+	clockRateMilliHz := Frequency(clockRate) * Hertz
+	for _, m := range modes {
+		if m.channels != 1 {
+			continue
+		}
+		fast := clockRateMilliHz / Frequency(m.tickLow)
+		slowDivisor := Frequency(m.tickHigh * m.divide)
+		slow := (clockRateMilliHz + slowDivisor - 1) / slowDivisor
+		if max == 0 || fast > max {
+			max = fast
+		}
+		if min == 0 || slow < min {
+			min = slow
+		}
+	}
+	return min, max
+}
 
 // ValidateLogic checks a logic configuration without accessing the device.
 func (s *BitScope) ValidateLogic(c Config) error {

@@ -50,12 +50,13 @@ var fx2Rates = []Frequency{
 // FX2 is an eight-channel, 24 MHz Saleae Logic clone. Do not use it with
 // another capture program.
 type FX2 struct {
-	ID   string
-	ctx  *gousb.Context
-	dev  *gousb.Device
-	cfg  *gousb.Config
-	intf *gousb.Interface
-	in   *gousb.InEndpoint
+	ID     string
+	device *device
+	ctx    *gousb.Context
+	dev    *gousb.Device
+	cfg    *gousb.Config
+	intf   *gousb.Interface
+	in     *gousb.InEndpoint
 	// idle is when the previous acquisition has stopped. The firmware
 	// stops only when its EP2 FIFO fills, then it discards the FIFO.
 	// Without this wait, the next trace starts with old samples.
@@ -78,7 +79,7 @@ func OpenFX2() (_ *FX2, err error) {
 	if err != nil {
 		return nil, err
 	}
-	d := &FX2{ctx: ctx, dev: dev}
+	d := &FX2{ctx: ctx, dev: dev, device: newDevice(ClassFX2)}
 	defer func() {
 		if err != nil {
 			d.closeUSB()
@@ -184,13 +185,34 @@ func (d *FX2) closeUSB() error {
 // String returns the device ID.
 func (d *FX2) String() string { return d.ID }
 
+// fx2SuggestedRates are a selection of fx2Rates: 24 MHz divided by 1, 2,
+// 3, 4, 6, 12, and 24, then some slower rates down to the minimum.
+var fx2SuggestedRates = []Frequency{
+	24 * MegaHertz, 12 * MegaHertz, 8 * MegaHertz, 6 * MegaHertz, 4 * MegaHertz, 2 * MegaHertz, 1 * MegaHertz,
+	500 * KiloHertz, 100 * KiloHertz, 20 * KiloHertz,
+}
+
+// Capabilities returns the eight inputs of the Saleae Logic clone.
+// ValidateLogic also accepts the other rates in fx2Rates.
+func (d *FX2) Capabilities() CapabilitySet { return fx2Capabilities(d.device) }
+
+func fx2Capabilities(dev *device) CapabilitySet {
+	return CapabilitySet{Resources: digitalInputs(dev, 8,
+		fx2Rates[0], fx2Rates[len(fx2Rates)-1], slices.Clone(fx2SuggestedRates))}
+}
+
 // Close releases the device.
 func (d *FX2) Close() error {
 	if d.ctx == nil {
 		return errors.New("fx2lafw: analyser is closed")
 	}
 	err := d.closeUSB()
-	*d = FX2{ID: d.ID}
+	d.ctx = nil
+	d.dev = nil
+	d.cfg = nil
+	d.intf = nil
+	d.in = nil
+	d.idle = time.Time{}
 	return err
 }
 

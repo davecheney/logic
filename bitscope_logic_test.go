@@ -81,7 +81,7 @@ func TestLogicCapture(t *testing.T) {
 					return cmd
 				}
 			}}
-			s := &BitScope{ID: "BS000500", vm: vm{port: p, timeout: time.Second}}
+			s := &BitScope{name: "BS000500", vm: vm{port: p, timeout: time.Second}}
 			tr, err := s.CaptureLogic(context.Background(), c)
 			if err != nil {
 				t.Fatal(err)
@@ -181,7 +181,7 @@ func TestLogicCancellation(t *testing.T) {
 			return cmd
 		}
 	}}
-	s := &BitScope{ID: "BS000500", vm: vm{port: p, timeout: time.Second}}
+	s := &BitScope{name: "BS000500", vm: vm{port: p, timeout: time.Second}}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
 	defer cancel()
 	if _, err := s.CaptureLogic(ctx, logicConfig()); !errors.Is(err, context.DeadlineExceeded) {
