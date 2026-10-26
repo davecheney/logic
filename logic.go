@@ -23,16 +23,16 @@ type Config struct {
 // Trace holds packed samples. Bit n of a sample is the state of Ln.
 // Width is the number of bytes in each sample: zero or one for L0 through
 // L7, or two (little endian) for L0 through L15. JSON encodes Samples as
-// base64. Rate is the actual sample rate.
+// base64. Rate is the actual sample rate, rounded to the nearest milliHertz.
 type Trace struct {
-	Rate      float64 `json:"sample_rate_hz"`
-	Channels  uint16  `json:"channels"`
-	Source    int     `json:"trigger_channel"`
-	Falling   bool    `json:"falling"`
-	TriggerAt int     `json:"trigger_sample"`
-	Triggered bool    `json:"triggered"`
-	Width     int     `json:"sample_bytes,omitempty"`
-	Samples   []byte  `json:"samples"`
+	Rate      Frequency `json:"sample_rate"`
+	Channels  uint16    `json:"channels"`
+	Source    int       `json:"trigger_channel"`
+	Falling   bool      `json:"falling"`
+	TriggerAt int       `json:"trigger_sample"`
+	Triggered bool      `json:"triggered"`
+	Width     int       `json:"sample_bytes,omitempty"`
+	Samples   []byte    `json:"samples"`
 }
 
 // Len returns the number of samples.

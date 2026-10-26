@@ -42,7 +42,27 @@ func (l *line) text(s string) {
 }
 
 func (l *line) trace() *logic.Trace {
-	return &logic.Trace{Rate: 8000, Channels: 1 << 2, TriggerAt: 8, Samples: l.s}
+	return &logic.Trace{Rate: 8 * logic.KiloHertz, Channels: 1 << 2, TriggerAt: 8, Samples: l.s}
+}
+
+func TestFractionalRate(t *testing.T) {
+	var l line
+	l.level(1, 1)
+	l.text("a")
+	l.level(1, 1)
+	l.text("b")
+	l.level(1, 2)
+	tr := l.trace()
+	tr.Rate, tr.TriggerAt = 8500*logic.MilliHertz, 0
+	var out, stderr bytes.Buffer
+	if err := run([]string{"-line", "2", "-baud", "1.0625", "-gap", "500ms"},
+		capture(t, tr), &out, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	const want = "+0.941176471 \"a\"\n+11.294117647 \"b\"\n"
+	if got := out.String(); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
 }
 
 func cfg() config { return config{line: 2, baud: 1000, parity: "none", stop: 1} }

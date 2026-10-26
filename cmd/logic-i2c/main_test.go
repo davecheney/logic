@@ -43,7 +43,7 @@ func (b *bus) byte(v byte, nack bool) {
 }
 
 func (b *bus) trace() *logic.Trace {
-	return &logic.Trace{Rate: 1e6, Channels: 1<<sda | 1<<scl, Samples: b.s}
+	return &logic.Trace{Rate: logic.MegaHertz, Channels: 1<<sda | 1<<scl, Samples: b.s}
 }
 
 func capture(t *testing.T, tr *logic.Trace) *bytes.Buffer {
@@ -114,12 +114,22 @@ func TestRun(t *testing.T) {
 	b.start()
 	b.byte(0x3c<<1, false)
 	b.stop()
-	var out, stderr bytes.Buffer
-	if err := run([]string{"-sda", "5", "-scl", "6"}, capture(t, b.trace()), &out, &stderr); err != nil {
-		t.Fatal(err)
-	}
-	if got, want := out.String(), "+0.000008000 S 3c W A P\n"; got != want {
-		t.Fatalf("got %q, want %q", got, want)
+	for _, tc := range []struct {
+		rate logic.Frequency
+		want string
+	}{
+		{logic.MegaHertz, "+0.000008000 S 3c W A P\n"},
+		{2500 * logic.MilliHertz, "+3.200000000 S 3c W A P\n"},
+	} {
+		tr := b.trace()
+		tr.Rate = tc.rate
+		var out, stderr bytes.Buffer
+		if err := run([]string{"-sda", "5", "-scl", "6"}, capture(t, tr), &out, &stderr); err != nil {
+			t.Fatal(err)
+		}
+		if got := out.String(); got != tc.want {
+			t.Fatalf("rate %v: got %q, want %q", tc.rate, got, tc.want)
+		}
 	}
 }
 

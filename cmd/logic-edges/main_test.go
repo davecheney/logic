@@ -11,13 +11,35 @@ import (
 // trace has L0 and L1 at 1 MS/s with the trigger at sample 2.
 func trace(t *testing.T) *bytes.Buffer {
 	t.Helper()
-	tr := &logic.Trace{Rate: 1e6, Channels: 3, TriggerAt: 2, Triggered: true,
+	tr := &logic.Trace{Rate: logic.MegaHertz, Channels: 3, TriggerAt: 2, Triggered: true,
 		Samples: []byte{0, 1, 1, 3, 3, 2, 0}}
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(tr); err != nil {
 		t.Fatal(err)
 	}
 	return &buf
+}
+
+func TestFractionalRate(t *testing.T) {
+	const input = `{"sample_rate":"2.5Hz","channels":1,"trigger_sample":1,"samples":"AAEA"}`
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{nil, "# sample_rate_hz=2.5 trigger_sample=1 triggered=false start=-0.400000000 L0=0\n" +
+			"+0.000000000 L0 1\n+0.400000000 L0 0\n"},
+		{[]string{"-from", "0s", "-to", "400ms"},
+			"# sample_rate_hz=2.5 trigger_sample=1 triggered=false start=+0.000000000 L0=1\n" +
+				"+0.400000000 L0 0\n"},
+	} {
+		var out, stderr bytes.Buffer
+		if err := run(tc.args, bytes.NewBufferString(input), &out, &stderr); err != nil {
+			t.Fatal(err)
+		}
+		if got := out.String(); got != tc.want {
+			t.Errorf("args %v: got %q, want %q", tc.args, got, tc.want)
+		}
+	}
 }
 
 func TestEdges(t *testing.T) {

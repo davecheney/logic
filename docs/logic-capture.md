@@ -30,18 +30,24 @@ The units are case sensitive. A number without a unit is in Hz, so
 Use `-output -` to write data to stdout. Status and errors go to stderr.
 An existing output file is not overwritten.
 
-JSON is the default format. It contains `sample_rate_hz`, `channels`,
+JSON is the default format. It contains `sample_rate`, `channels`,
 `trigger_channel`, `falling`, `trigger_sample`, `triggered`, and `samples`.
 The sample field is a base64 string. Decode it to get one byte per sample.
 If `sample_bytes` is 2, each sample is a little-endian 16-bit value
 instead. Bit n is the state of Ln. Disabled bits are zero. The sample rate
-in the file is the actual rate, not the requested rate.
+in the file is the actual rate, not the requested rate. `sample_rate`
+is a string with a unit, for example `"4MHz"` or `"2.5Hz"`. The actual
+rate is rounded to the nearest milliHertz. The maximum rounding error is
+0.0005 Hz.
 
-CSV has the same metadata in lines that start with `#`, then a
-`time_seconds` column and one column per enabled input. Times start at
-the first sample. Subtract `trigger_sample / sample_rate_hz` to get time
-relative to the trigger. With `triggered=false`, the trigger position is
-not a detected edge.
+Old JSON captures with a numeric `sample_rate_hz` field are not supported.
+Use the same version of the capture and decoder commands.
+
+CSV metadata is in lines that start with `#`, then a `time_seconds`
+column and one column per enabled input. Its `sample_rate_hz` metadata
+is still a number in Hertz. Times start at the first sample. Subtract
+`trigger_sample / sample_rate_hz` to get time relative to the trigger.
+With `triggered=false`, the trigger position is not a detected edge.
 
 VCD has one wire per enabled input, named Ln, and holds only the changes,
 so a long idle capture stays small. Times are in picoseconds from the

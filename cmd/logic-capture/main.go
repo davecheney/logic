@@ -98,7 +98,7 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 		return err
 	}
 	fmt.Fprintf(stderr, "%d samples at %.9g S/s, trigger sample %d, triggered=%t\n",
-		tr.Len(), tr.Rate, tr.TriggerAt, tr.Triggered)
+		tr.Len(), tr.Rate.Hz(), tr.TriggerAt, tr.Triggered)
 	if *output != "-" {
 		f, err := os.OpenFile(*output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 		if err != nil {

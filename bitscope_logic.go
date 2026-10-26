@@ -113,7 +113,7 @@ func (s *BitScope) CaptureLogic(ctx context.Context, c Config) (*Trace, error) {
 		data[i] &= uint8(c.Channels)
 	}
 	return &Trace{
-		Rate: clockRate / float64(ticks), Channels: c.Channels,
+		Rate: frequencyFromHz(clockRate / float64(ticks)), Channels: c.Channels,
 		Source: c.Source, Falling: c.Falling, TriggerAt: trigger,
 		Triggered: status == statusDone, Samples: data,
 	}, nil

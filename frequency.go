@@ -1,7 +1,9 @@
 package logic
 
 import (
+	"encoding/json"
 	"errors"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -33,6 +35,30 @@ var frequencyUnits = []struct {
 
 // Hz returns f in Hertz.
 func (f Frequency) Hz() float64 { return float64(f) / float64(Hertz) }
+
+// frequencyFromHz rounds a validated device rate to whole milliHertz.
+func frequencyFromHz(hz float64) Frequency {
+	return Frequency(math.Round(hz * float64(Hertz)))
+}
+
+// MarshalJSON encodes f as a JSON string with a unit suffix.
+func (f Frequency) MarshalJSON() ([]byte, error) {
+	return json.Marshal(f.String())
+}
+
+// UnmarshalJSON decodes a JSON string using ParseFrequency.
+func (f *Frequency) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	v, err := ParseFrequency(s)
+	if err != nil {
+		return err
+	}
+	*f = v
+	return nil
+}
 
 // String returns f with the largest unit that keeps the integer part not
 // zero, for example "4MHz", "2.5kHz", or "500mHz". Zero is "0Hz".

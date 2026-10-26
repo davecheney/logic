@@ -86,7 +86,7 @@ func TestLogicCapture(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if tr.Rate != 4e6 || tr.TriggerAt != 1 || tr.Triggered != (status == "00") ||
+			if tr.Rate != 4*MegaHertz || tr.TriggerAt != 1 || tr.Triggered != (status == "00") ||
 				tr.Channels != 3 || tr.Source != 1 || !tr.Falling || len(tr.Samples) != 32 {
 				t.Fatalf("trace: %+v", tr)
 			}
@@ -108,6 +108,41 @@ func TestLogicCapture(t *testing.T) {
 			if strings.ContainsAny(p.wrote.String(), "XYZW") {
 				t.Fatal("logic capture programmed an output generator")
 			}
+		}
+	}
+}
+
+func TestLogicCaptureRate(t *testing.T) {
+	for _, tc := range []struct {
+		rate Frequency
+		want Frequency
+	}{
+		{4 * MegaHertz, 4 * MegaHertz},
+		{3 * MegaHertz, 2_857_142_857 * MilliHertz},
+		{7 * MegaHertz, 6_666_666_667 * MilliHertz},
+		{2_441_407 * MilliHertz, 2_441_406 * MilliHertz},
+	} {
+		c := logicConfig()
+		c.Rate, c.Samples, c.PreTrigger = tc.rate, 32, 0
+		p := &testPort{reply: func(cmd string) string {
+			switch cmd {
+			case "7c@p":
+				return cmd + "\r00\r"
+			case "D":
+				return cmd + "02\r1234\r00\r2345\r000010\r"
+			case "A":
+				return cmd + string(make([]byte, c.Samples))
+			default:
+				return cmd
+			}
+		}}
+		s := &BitScope{vm: vm{port: p, timeout: time.Second}}
+		tr, err := s.CaptureLogic(context.Background(), c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tr.Rate != tc.want {
+			t.Errorf("requested %v: got %v, want %v", tc.rate, tr.Rate, tc.want)
 		}
 	}
 }
@@ -161,13 +196,13 @@ func TestLogicCancellation(t *testing.T) {
 }
 
 func TestLogicExport(t *testing.T) {
-	tr := &Trace{Rate: 4e6, Channels: 3, Source: 1, TriggerAt: 1, Triggered: true, Samples: []byte{0, 1, 3, 2}}
+	tr := &Trace{Rate: 4 * MegaHertz, Channels: 3, Source: 1, TriggerAt: 1, Triggered: true, Samples: []byte{0, 1, 3, 2}}
 	var b bytes.Buffer
 	if err := Write(&b, "json", tr); err != nil {
 		t.Fatal(err)
 	}
 	var decoded Trace
-	if err := json.Unmarshal(b.Bytes(), &decoded); err != nil || !bytes.Equal(tr.Samples, decoded.Samples) || decoded.Rate != 4e6 {
+	if err := json.Unmarshal(b.Bytes(), &decoded); err != nil || !bytes.Equal(tr.Samples, decoded.Samples) || decoded.Rate != 4*MegaHertz {
 		t.Fatalf("JSON round trip: %+v %v", decoded, err)
 	}
 	b.Reset()
@@ -234,9 +269,9 @@ func TestLogicDevice(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tr.Rate != 4e6 || len(tr.Samples) != c.Samples {
+		if tr.Rate != 4*MegaHertz || len(tr.Samples) != c.Samples {
 			t.Fatalf("unexpected capture: %+v", tr)
 		}
-		t.Logf("%d samples at %g S/s, trigger=%t", len(tr.Samples), tr.Rate, tr.Triggered)
+		t.Logf("%d samples at %g S/s, trigger=%t", len(tr.Samples), tr.Rate.Hz(), tr.Triggered)
 	}
 }
