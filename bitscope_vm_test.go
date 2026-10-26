@@ -56,8 +56,8 @@ func TestVM(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.ID != "BS000500" {
-		t.Fatalf("ID %q", s.ID)
+	if s.Name() != "BS000500" {
+		t.Fatalf("Name %q", s.Name())
 	}
 	value, err := s.vm.register(regKitchenSinkB)
 	if err != nil || value != 0xc0 {

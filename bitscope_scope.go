@@ -161,16 +161,19 @@ func choose(channels int, span float64, samples int) (plan, error) {
 
 // BitScope is an open BitScope.
 type BitScope struct {
-	vm   vm
-	port serial.Port
-	// ID is the device revision, for example "BS000500".
-	ID string
+	vm     vm
+	port   serial.Port
+	name   string
+	device *device
 }
 
+// Name returns the device revision, for example "BS000500".
+func (s *BitScope) Name() string { return s.name }
+
 // OpenBitScope opens the BitScope on the named serial port.
-func OpenBitScope(name string) (*BitScope, error) {
+func OpenBitScope(port string) (*BitScope, error) {
 	// The FT245R is a FIFO, so the baud rate has no effect.
-	p, err := serial.Open(name, &serial.Mode{BaudRate: 460800})
+	p, err := serial.Open(port, &serial.Mode{BaudRate: 460800})
 	if err != nil {
 		return nil, err
 	}
@@ -187,9 +190,9 @@ func OpenBitScope(name string) (*BitScope, error) {
 	return s, nil
 }
 
-// NewBitScope resets the device on p and reads its ID.
+// NewBitScope resets the device on p and reads its name.
 func NewBitScope(p Port) (*BitScope, error) {
-	s := &BitScope{vm: vm{port: p, timeout: linkTimeout}}
+	s := &BitScope{vm: vm{port: p, timeout: linkTimeout}, device: newDevice(ClassBitScope)}
 	if err := s.vm.reset(); err != nil {
 		return nil, err
 	}
@@ -200,7 +203,7 @@ func NewBitScope(p Port) (*BitScope, error) {
 	if id != "BS000500" && id != "BS000501" {
 		return nil, fmt.Errorf("bitscope: unsupported device %q", id)
 	}
-	s.ID = id
+	s.name = id
 	return s, nil
 }
 
@@ -393,7 +396,7 @@ func (c ScopeConfig) validate() error {
 func (s *BitScope) wait(ctx context.Context) (uint64, error) {
 	for {
 		if ctx.Err() != nil {
-			if err := s.vm.cancelTrace(s.ID); err != nil {
+			if err := s.vm.cancelTrace(s.name); err != nil {
 				return 0, fmt.Errorf("bitscope: cancel trace: %w", err)
 			}
 			return 0, ctx.Err()

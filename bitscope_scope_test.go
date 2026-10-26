@@ -59,7 +59,7 @@ func TestDevice(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	t.Logf("device %s", s.ID)
+	t.Logf("device %s", s.Name())
 	for _, span := range []time.Duration{100 * time.Microsecond, time.Millisecond, 10 * time.Millisecond, 100 * time.Millisecond} {
 		for _, ab := range [][2]bool{{true, false}, {false, true}, {true, true}} {
 			start := time.Now()

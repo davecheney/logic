@@ -52,8 +52,10 @@ func (t *Trace) At(i int) uint16 {
 }
 
 // Analyzer is an open logic analyser. String returns the device ID.
+// Capabilities describes its resources.
 type Analyzer interface {
 	fmt.Stringer
+	Capabilities() CapabilitySet
 	ValidateLogic(Config) error
 	CaptureLogic(context.Context, Config) (*Trace, error)
 	Close() error
