@@ -31,14 +31,15 @@ type captureOptions struct {
 	Auto        time.Duration
 }
 
-func run(args []string, stdout, stderr io.Writer) (err error) {
+func run(args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("logic-capture", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	device := flags.String("device", "", "analyser, required: "+strings.Join(analyzer.Devices(), ", "))
 	port := flags.String("port", "", "BitScope, OLS, or Logic Pirate serial port (default: search)")
 	threshold := flags.String("threshold", "3.3", "DSLogic input threshold: 3.3 or 5 (volts)")
 	rate := 4 * logic.MegaHertz
-	flags.Func("rate", "sample rate, such as 4MHz or 4000000 (Hz); supported rates depend on the analyser (default 4MHz)", func(s string) (err error) {
+	flags.Func("rate", "sample rate, such as 4MHz or 4000000 (Hz); supported rates depend on the analyser (default 4MHz)", func(s string) error {
+		var err error
 		rate, err = logic.ParseFrequency(s)
 		return err
 	})
@@ -105,14 +106,13 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	if err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, dev.Close()) }()
 	caps = dev.Capabilities()
 	req, err = captureRequest(&caps, cfg)
 	if err != nil {
-		return err
+		return errors.Join(err, dev.Close())
 	}
 	if err := dev.ValidateCapture(req); err != nil {
-		return err
+		return errors.Join(err, dev.Close())
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -124,19 +124,20 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	fmt.Fprintf(stderr, "%s: starting capture, trigger L%d; output %s\n", dev, cfg.Source, *output)
 	tr, err := dev.CaptureLogic(ctx, req)
 	if err != nil {
-		return err
+		return errors.Join(err, dev.Close())
 	}
 	fmt.Fprintf(stderr, "%d samples at %.9g S/s, trigger sample %d, triggered=%t\n",
 		tr.Len(), tr.Rate.Hz(), tr.TriggerAt, tr.Triggered)
 	if *output != "-" {
 		f, err := os.OpenFile(*output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 		if err != nil {
-			return err
+			return errors.Join(err, dev.Close())
 		}
-		defer func() { err = errors.Join(err, f.Close()) }()
-		stdout = f
+		err = logic.Write(f, *format, tr)
+		return errors.Join(errors.Join(err, f.Close()), dev.Close())
 	}
-	return logic.Write(stdout, *format, tr)
+	err = logic.Write(stdout, *format, tr)
+	return errors.Join(err, dev.Close())
 }
 
 type resourceCapabilities interface {

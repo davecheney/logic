@@ -56,8 +56,9 @@ func FindPort() (string, error) {
 
 // OpenOLS opens and identifies an Open Logic Sniffer. An empty port searches
 // for one connected device. The serial baud rate is ignored by the device.
-func Open(port string) (_ *OLS, err error) {
+func Open(port string) (*OLS, error) {
 	if port == "" {
+		var err error
 		port, err = FindPort()
 		if err != nil {
 			return nil, err
@@ -68,22 +69,17 @@ func Open(port string) (_ *OLS, err error) {
 		return nil, fmt.Errorf("ols: open %s: %w", port, err)
 	}
 	d := &OLS{port: p, device: logic.NewDevice(logic.ClassOLS)}
-	defer func() {
-		if err != nil {
-			err = errors.Join(err, p.Close())
-		}
-	}()
 	if err := p.SetReadTimeout(sump.ReadTimeout); err != nil {
-		return nil, fmt.Errorf("ols: set read timeout: %w", err)
+		return nil, errors.Join(fmt.Errorf("ols: set read timeout: %w", err), p.Close())
 	}
 	if err := p.ResetInputBuffer(); err != nil {
-		return nil, fmt.Errorf("ols: clear input: %w", err)
+		return nil, errors.Join(fmt.Errorf("ols: clear input: %w", err), p.Close())
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	d.meta, err = identifyOLS(ctx, d.port)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, p.Close())
 	}
 	d.ID = fmt.Sprintf("%s, Demon Core %s", d.meta.Name, d.meta.FPGA)
 	return d, nil

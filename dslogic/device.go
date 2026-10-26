@@ -55,32 +55,22 @@ type DSLogic struct {
 
 // Open finds the first original DSLogic, loads the FX2 firmware if
 // necessary, and configures the FPGA for threshold t.
-func Open(t Threshold) (_ *DSLogic, err error) {
+func Open(t Threshold) (*DSLogic, error) {
 	ctx := gousb.NewContext()
-	defer func() {
-		if err != nil {
-			ctx.Close()
-		}
-	}()
 	dev, err := find(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, ctx.Close())
 	}
 	d := &DSLogic{ctx: ctx, dev: dev, device: logic.NewDevice(logic.ClassDSLogic)}
-	defer func() {
-		if err != nil {
-			d.closeUSB()
-		}
-	}()
 	if err := d.claim(); err != nil {
-		return nil, err
+		return nil, errors.Join(err, d.closeUSB())
 	}
 	var fw [2]byte
 	if err := d.read(ctlFWVersion, 0, fw[:]); err != nil {
-		return nil, fmt.Errorf("dslogic: firmware version: %w", err)
+		return nil, errors.Join(fmt.Errorf("dslogic: firmware version: %w", err), d.closeUSB())
 	}
 	if fw[0] != 2 {
-		return nil, fmt.Errorf("dslogic: firmware version %d.%d, want 2.x", fw[0], fw[1])
+		return nil, errors.Join(fmt.Errorf("dslogic: firmware version %d.%d, want 2.x", fw[0], fw[1]), d.closeUSB())
 	}
 	serial, _ := dev.SerialNumber()
 	d.ID = "DSLogic"
@@ -88,7 +78,7 @@ func Open(t Threshold) (_ *DSLogic, err error) {
 		d.ID += " " + serial
 	}
 	if err := d.SetThreshold(t); err != nil {
-		return nil, err
+		return nil, errors.Join(err, d.closeUSB())
 	}
 	return d, nil
 }

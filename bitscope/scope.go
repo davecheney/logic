@@ -44,13 +44,13 @@ var analog = struct {
 }{1.1, -0.05, 0, 1.1, -0.05, -0.05, 18.333, -7.517, -5.5, 8}
 
 // InputRange returns the nominal x1 capture range, in volts.
-func InputRange() (low, high float64) { return analog.safeLow, analog.safeHigh }
+func InputRange() (float64, float64) { return analog.safeLow, analog.safeHigh }
 
 func toConverter(v float64) float64 { return (v - analog.offset) / analog.scale }
 
 // converterRange returns the ConverterLo and ConverterHi values that
 // make the ADC span low to high volts.
-func converterRange(low, high float64) (lo, hi float64) {
+func converterRange(low, high float64) (float64, float64) {
 	l, h := toConverter(low), toConverter(high)
 	return analog.la*l + analog.lb*h + analog.lc, analog.ha*h + analog.hb*l + analog.hc
 }
