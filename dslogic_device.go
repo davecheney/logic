@@ -289,15 +289,39 @@ var dslogicRates = []Frequency{
 
 // Capabilities returns the 16 inputs of the DSLogic. At 400 MHz only L0
 // to L3 work, and at 200 MHz only L0 to L7. The table does not show
-// this; ValidateLogic returns an error for those combinations.
+// this; validateLogic returns an error for those combinations.
 func (d *DSLogic) Capabilities() CapabilitySet { return dslogicCapabilities(d.device) }
 
-func dslogicCapabilities(dev *device) CapabilitySet {
-	return CapabilitySet{Resources: digitalInputs(dev, 16, minRate, quarterRate, dslogicRates)}
+// ConfigureAWG rejects AWG requests because the DSLogic has no output resources.
+func (d *DSLogic) ConfigureAWG(req OutputRequest) (Frequency, error) {
+	if err := validateOutputRequest(d.device, d.Capabilities(), req); err != nil {
+		return 0, err
+	}
+	return 0, errors.New("dslogic: no output resources")
 }
 
-// ValidateLogic checks a logic configuration for the DSLogic.
-func (d *DSLogic) ValidateLogic(c Config) error {
+func dslogicCapabilities(dev *device) CapabilitySet {
+	sampleLimits := make([]SampleLimit, 16)
+	for i := range sampleLimits {
+		inputs := i + 1
+		sampleLimits[i] = SampleLimit{InputCount: inputs, MaxSamples: depth(inputs)}
+	}
+	return CapabilitySet{
+		resources:    digitalInputs(dev, 16, minRate, quarterRate, dslogicRates),
+		sampleLimits: sampleLimits,
+	}
+}
+
+// validateLogic checks a logic configuration for the DSLogic.
+func (d *DSLogic) ValidateCapture(req CaptureRequest) error {
+	c, err := captureConfig(d.device, d.Capabilities(), req)
+	if err != nil {
+		return err
+	}
+	return d.validateLogic(c)
+}
+
+func (d *DSLogic) validateLogic(c logicConfig) error {
 	_, err := dslogicPlan(c)
 	return err
 }
@@ -305,7 +329,15 @@ func (d *DSLogic) ValidateLogic(c Config) error {
 // CaptureLogic arms the DSLogic, waits for the trigger, and reads the
 // buffer. If c.Auto is not zero and no trigger occurs within c.Auto after
 // the buffer can fill, the device captures again without a trigger.
-func (d *DSLogic) CaptureLogic(ctx context.Context, c Config) (*Trace, error) {
+func (d *DSLogic) CaptureLogic(ctx context.Context, req CaptureRequest) (*Trace, error) {
+	c, err := captureConfig(d.device, d.Capabilities(), req)
+	if err != nil {
+		return nil, err
+	}
+	return d.captureLogic(ctx, c)
+}
+
+func (d *DSLogic) captureLogic(ctx context.Context, c logicConfig) (*Trace, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}

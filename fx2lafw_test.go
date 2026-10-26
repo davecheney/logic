@@ -12,38 +12,39 @@ import (
 	"time"
 )
 
-func fx2Config() Config {
-	return Config{Channels: 0x81, Rate: MegaHertz, Samples: 6, Source: 7, PreTrigger: 0.5}
+func fx2Config() logicConfig {
+	return logicConfig{Channels: 0x81, Rate: MegaHertz, Samples: 6, Source: 7, PreTrigger: 0.5}
 }
 
 func TestFX2Validate(t *testing.T) {
+	dev := &FX2{device: newDevice(ClassFX2)}
 	c := fx2Config()
 	for _, rate := range fx2Rates {
 		c.Rate = rate
-		if err := Validate("fx2lafw", c); err != nil {
+		if err := Validate("fx2lafw", captureRequestForTest(dev, c)); err != nil {
 			t.Fatalf("rate %v: %v", rate, err)
 		}
 	}
-	for name, change := range map[string]func(*Config){
-		"no channels": func(c *Config) { c.Channels = 0 },
-		"channel 8":   func(c *Config) { c.Channels = 0x100 },
-		"source":      func(c *Config) { c.Source = 8 },
-		"negative":    func(c *Config) { c.Source = -1 },
-		"disabled":    func(c *Config) { c.Source = 1 },
-		"rate":        func(c *Config) { c.Rate = 5 * MegaHertz },
-		"too fast":    func(c *Config) { c.Rate = 48 * MegaHertz },
-		"rate zero":   func(c *Config) { c.Rate = 0 },
-		"rate mHz":    func(c *Config) { c.Rate = MegaHertz + 1 },
-		"samples":     func(c *Config) { c.Samples = 1 },
-		"pre low":     func(c *Config) { c.PreTrigger = -0.1 },
-		"pre high":    func(c *Config) { c.PreTrigger = 1 },
-		"pre NaN":     func(c *Config) { c.PreTrigger = math.NaN() },
-		"auto":        func(c *Config) { c.Auto = -time.Second },
+	for name, change := range map[string]func(*logicConfig){
+		"no channels": func(c *logicConfig) { c.Channels = 0 },
+		"channel 8":   func(c *logicConfig) { c.Channels = 0x100 },
+		"source":      func(c *logicConfig) { c.Source = 8 },
+		"negative":    func(c *logicConfig) { c.Source = -1 },
+		"disabled":    func(c *logicConfig) { c.Source = 1 },
+		"rate":        func(c *logicConfig) { c.Rate = 5 * MegaHertz },
+		"too fast":    func(c *logicConfig) { c.Rate = 48 * MegaHertz },
+		"rate zero":   func(c *logicConfig) { c.Rate = 0 },
+		"rate mHz":    func(c *logicConfig) { c.Rate = MegaHertz + 1 },
+		"samples":     func(c *logicConfig) { c.Samples = 1 },
+		"pre low":     func(c *logicConfig) { c.PreTrigger = -0.1 },
+		"pre high":    func(c *logicConfig) { c.PreTrigger = 1 },
+		"pre NaN":     func(c *logicConfig) { c.PreTrigger = math.NaN() },
+		"auto":        func(c *logicConfig) { c.Auto = -time.Second },
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := fx2Config()
 			change(&c)
-			if err := Validate("fx2lafw", c); err == nil {
+			if err := Validate("fx2lafw", captureRequestForTest(dev, c)); err == nil {
 				t.Fatal("invalid configuration accepted")
 			}
 		})

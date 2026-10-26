@@ -22,6 +22,26 @@ type AWGConfig struct {
 	Waveform  Waveform
 }
 
+// ConfigureAWG configures the BitScope AWG and enables or disables it.
+// Call it only between captures. The returned frequency is the programmed
+// clock rate, not a measurement.
+func (s *BitScope) ConfigureAWG(req OutputRequest) (Frequency, error) {
+	if err := validateOutputRequest(s.device, s.Capabilities(), req); err != nil {
+		return 0, err
+	}
+	if !req.Enable {
+		_, err := s.SetAWG(AWGConfig{})
+		return 0, err
+	}
+	actual, err := s.SetAWG(AWGConfig{
+		Enabled: true, Frequency: req.Frequency.Hz(), Waveform: req.Waveform,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return frequencyFromHz(actual), nil
+}
+
 func awgTiming(frequency float64) (ticks, size int, actual float64, err error) {
 	if math.IsNaN(frequency) || math.IsInf(frequency, 0) || frequency < 10 || frequency > 10000 {
 		return 0, 0, 0, errors.New("bitscope: AWG frequency must be between 10 and 10000 Hz")

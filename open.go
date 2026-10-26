@@ -7,14 +7,18 @@ import (
 
 // driver opens and checks one kind of analyser.
 type driver struct {
-	name     string
-	open     func(port string, th Threshold) (Analyzer, error)
-	validate func(Config) error
+	name         string
+	class        DeviceClass
+	open         func(port string, th Threshold) (Analyzer, error)
+	capabilities func(*device) CapabilitySet
+	validate     func(logicConfig) error
 }
 
 var drivers = []driver{
 	{
-		name: "bitscope",
+		name:         "bitscope",
+		class:        ClassBitScope,
+		capabilities: bitscopeCapabilities,
 		open: func(port string, _ Threshold) (Analyzer, error) {
 			if port == "" {
 				p, err := FindPort()
@@ -25,22 +29,28 @@ var drivers = []driver{
 			}
 			return OpenBitScope(port)
 		},
-		validate: (&BitScope{}).ValidateLogic,
+		validate: (&BitScope{}).validateLogic,
 	},
 	{
-		name:     "dslogic",
-		open:     func(_ string, th Threshold) (Analyzer, error) { return OpenDSLogic(th) },
-		validate: (&DSLogic{}).ValidateLogic,
+		name:         "dslogic",
+		class:        ClassDSLogic,
+		open:         func(_ string, th Threshold) (Analyzer, error) { return OpenDSLogic(th) },
+		capabilities: dslogicCapabilities,
+		validate:     (&DSLogic{}).validateLogic,
 	},
 	{
-		name:     "fx2lafw",
-		open:     func(_ string, _ Threshold) (Analyzer, error) { return OpenFX2() },
-		validate: (&FX2{}).ValidateLogic,
+		name:         "fx2lafw",
+		class:        ClassFX2,
+		open:         func(_ string, _ Threshold) (Analyzer, error) { return OpenFX2() },
+		capabilities: fx2Capabilities,
+		validate:     (&FX2{}).validateLogic,
 	},
 	{
-		name:     "saleae",
-		open:     func(_ string, _ Threshold) (Analyzer, error) { return OpenFX2() },
-		validate: (&FX2{}).ValidateLogic,
+		name:         "saleae",
+		class:        ClassFX2,
+		open:         func(_ string, _ Threshold) (Analyzer, error) { return OpenFX2() },
+		capabilities: fx2Capabilities,
+		validate:     (&FX2{}).validateLogic,
 	},
 }
 
@@ -75,9 +85,37 @@ func Open(name, port string, th Threshold) (Analyzer, error) {
 	return d.open(port, th)
 }
 
-// Validate checks c for the named analyser without opening it.
-func Validate(name string, c Config) error {
+// CapabilitiesFor returns the resources for a device name without opening
+// hardware. Its resource IDs describe a synthetic device and cannot address
+// an opened analyser.
+func CapabilitiesFor(name string) (CapabilitySet, error) {
 	d, err := lookup(name)
+	if err != nil {
+		return CapabilitySet{}, err
+	}
+	return d.capabilities(newDevice(d.class)), nil
+}
+
+// Validate checks a request for the named analyser without opening it.
+func Validate(name string, req CaptureRequest) error {
+	d, err := lookup(name)
+	if err != nil {
+		return err
+	}
+	var dev *device
+	if len(req.Inputs) > 0 {
+		dev = req.Inputs[0].Device()
+	}
+	if dev == nil {
+		dev = req.Trigger.Device()
+	}
+	if dev == nil {
+		dev = &device{class: d.class}
+	}
+	if dev.class != d.class {
+		return fmt.Errorf("logic: request device class %s does not match %s", dev.class, d.name)
+	}
+	c, err := captureConfig(dev, d.capabilities(dev), req)
 	if err != nil {
 		return err
 	}

@@ -193,11 +193,19 @@ var fx2SuggestedRates = []Frequency{
 }
 
 // Capabilities returns the eight inputs of the Saleae Logic clone.
-// ValidateLogic also accepts the other rates in fx2Rates.
+// validateLogic also accepts the other rates in fx2Rates.
 func (d *FX2) Capabilities() CapabilitySet { return fx2Capabilities(d.device) }
 
+// ConfigureAWG rejects AWG requests because the FX2 has no output resources.
+func (d *FX2) ConfigureAWG(req OutputRequest) (Frequency, error) {
+	if err := validateOutputRequest(d.device, d.Capabilities(), req); err != nil {
+		return 0, err
+	}
+	return 0, errors.New("fx2lafw: no output resources")
+}
+
 func fx2Capabilities(dev *device) CapabilitySet {
-	return CapabilitySet{Resources: digitalInputs(dev, 8,
+	return CapabilitySet{resources: digitalInputs(dev, 8,
 		fx2Rates[0], fx2Rates[len(fx2Rates)-1], slices.Clone(fx2SuggestedRates))}
 }
 
@@ -241,8 +249,16 @@ func fx2StartCommand(rate Frequency) ([3]byte, error) {
 	return [3]byte{flags, byte(delay >> 8), byte(delay)}, nil
 }
 
-// ValidateLogic checks a configuration without accessing USB.
-func (d *FX2) ValidateLogic(c Config) error {
+// ValidateCapture checks a typed capture request without accessing USB.
+func (d *FX2) ValidateCapture(req CaptureRequest) error {
+	c, err := captureConfig(d.device, d.Capabilities(), req)
+	if err != nil {
+		return err
+	}
+	return d.validateLogic(c)
+}
+
+func (d *FX2) validateLogic(c logicConfig) error {
 	switch {
 	case c.Channels == 0 || c.Channels&^0xff != 0:
 		return errors.New("fx2lafw: select inputs L0 through L7")
@@ -262,10 +278,18 @@ func (d *FX2) ValidateLogic(c Config) error {
 
 // CaptureLogic streams all eight inputs and keeps the requested trigger
 // window. Auto is measured in sampled signal time, not USB startup time.
-func (d *FX2) CaptureLogic(ctx context.Context, c Config) (*Trace, error) {
-	if err := d.ValidateLogic(c); err != nil {
+func (d *FX2) CaptureLogic(ctx context.Context, req CaptureRequest) (*Trace, error) {
+	c, err := captureConfig(d.device, d.Capabilities(), req)
+	if err != nil {
 		return nil, err
 	}
+	if err := d.validateLogic(c); err != nil {
+		return nil, err
+	}
+	return d.captureLogic(ctx, c)
+}
+
+func (d *FX2) captureLogic(ctx context.Context, c logicConfig) (*Trace, error) {
 	if d.in == nil {
 		return nil, errors.New("fx2lafw: analyser is closed")
 	}
@@ -342,7 +366,7 @@ func fx2Drain(s *gousb.ReadStream) {
 	}
 }
 
-func fx2Read(ctx context.Context, r io.Reader, c Config) (*Trace, error) {
+func fx2Read(ctx context.Context, r io.Reader, c logicConfig) (*Trace, error) {
 	pre := int(float64(c.Samples) * c.PreTrigger)
 	data := make([]byte, c.Samples)
 	pos, filled, remaining := 0, 0, -1
