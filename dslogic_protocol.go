@@ -48,10 +48,10 @@ const (
 )
 
 const (
-	hwMaxRate   = 100e6
-	minRate     = 50e3
-	halfRate    = 200e6
-	quarterRate = 400e6
+	hwMaxRate   = 100 * MegaHertz
+	minRate     = 50 * KiloHertz
+	halfRate    = 200 * MegaHertz
+	quarterRate = 400 * MegaHertz
 	hwDepth     = 256 << 20 // bits of sample memory
 	headerSize  = 512
 	packetSize  = 512 // USB 2.0 bulk packet
@@ -114,8 +114,8 @@ func dslogicPlan(c Config) (*capture, error) {
 	switch {
 	case c.Channels == 0:
 		return nil, errors.New("dslogic: select at least one input")
-	case math.IsNaN(c.Rate) || math.IsInf(c.Rate, 0) || c.Rate < minRate || c.Rate > quarterRate:
-		return nil, fmt.Errorf("dslogic: sample rate must be between %g and %g S/s", minRate, quarterRate)
+	case c.Rate < minRate || c.Rate > quarterRate:
+		return nil, fmt.Errorf("dslogic: sample rate must be between %v and %v", minRate, quarterRate)
 	case c.Rate >= quarterRate && c.Channels&^0x000f != 0:
 		return nil, errors.New("dslogic: 400 MS/s supports only L0 through L3")
 	case c.Rate >= halfRate && c.Channels&^0x00ff != 0:
@@ -141,13 +141,13 @@ func dslogicPlan(c Config) (*capture, error) {
 	switch {
 	case c.Rate >= quarterRate:
 		s.Mode |= modeQuar
-		p.rate = quarterRate
+		p.rate = quarterRate.Hz()
 	case c.Rate >= halfRate:
 		s.Mode |= modeHalf
-		p.rate = halfRate
+		p.rate = halfRate.Hz()
 	default:
-		div = uint32(math.Ceil(hwMaxRate / c.Rate))
-		p.rate = hwMaxRate / float64(div)
+		div = uint32((hwMaxRate + c.Rate - 1) / c.Rate)
+		p.rate = hwMaxRate.Hz() / float64(div)
 	}
 	if math.Ceil(p.rate/1000*float64(n)/8) < 1024 {
 		s.Mode |= modeSlow

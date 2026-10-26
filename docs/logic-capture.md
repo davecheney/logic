@@ -21,6 +21,10 @@ The limits on rate, sample count, and pre-trigger depend on the analyser.
 See [bitscope.md](bitscope.md), [dslogic.md](dslogic.md), and
 [fx2lafw.md](fx2lafw.md).
 
+`-rate` is a frequency with a unit: `mHz`, `Hz`, `kHz`, `MHz`, or `GHz`.
+The units are case sensitive. A number without a unit is in Hz, so
+`-rate 4MHz`, `-rate 4000000`, and `-rate 4e6` are the same.
+
 ## Output
 
 Use `-output -` to write data to stdout. Status and errors go to stderr.

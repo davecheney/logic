@@ -22,7 +22,7 @@ func bitscopeLogicPlan(c Config) (ticks, trigger, timeout int, err error) {
 		err = errors.New("bitscope: select inputs L0 through L5")
 	case c.Source < 0 || c.Source > 5 || c.Channels&(1<<c.Source) == 0:
 		err = errors.New("bitscope: enable the logic trigger input")
-	case math.IsNaN(c.Rate) || math.IsInf(c.Rate, 0) || c.Rate < clockRate/16384 || c.Rate > 8e6:
+	case c.Rate.Hz() < clockRate/16384 || c.Rate > 8*MegaHertz:
 		err = errors.New("bitscope: logic sample rate must be between 2442 and 8000000 S/s")
 	case c.Samples < 32 || c.Samples > bufferSize:
 		err = errors.New("bitscope: logic sample count must be between 32 and 12288")
@@ -34,7 +34,7 @@ func bitscopeLogicPlan(c Config) (ticks, trigger, timeout int, err error) {
 	if err != nil {
 		return
 	}
-	ticks = int(math.Ceil(clockRate / c.Rate))
+	ticks = int(math.Ceil(clockRate / c.Rate.Hz()))
 	trigger = int(float64(c.Samples) * c.PreTrigger)
 	if c.PreTrigger > 0 && clockRate/float64(ticks) > maxPreTrigger {
 		err = errors.New("bitscope: pre-trigger logic capture requires at most 5000000 S/s")

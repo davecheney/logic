@@ -12,7 +12,7 @@ import (
 // Config selects the digital inputs to capture. Bit n of Channels is input Ln.
 type Config struct {
 	Channels   uint16
-	Rate       float64 // requested samples per second; rounded to a device clock step
+	Rate       Frequency // requested sample rate; rounded to a device clock step
 	Samples    int
 	Source     int // trigger input
 	Falling    bool

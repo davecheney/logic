@@ -15,7 +15,7 @@ import (
 )
 
 func logicConfig() Config {
-	return Config{Channels: 3, Rate: 4e6, Samples: 12000, Source: 1, PreTrigger: 0.05}
+	return Config{Channels: 3, Rate: 4 * MegaHertz, Samples: 12000, Source: 1, PreTrigger: 0.05}
 }
 
 func TestLogicPlan(t *testing.T) {
@@ -27,11 +27,11 @@ func TestLogicPlan(t *testing.T) {
 	if post := float64(c.Samples-trigger) * float64(ticks) / clockRate; post < 0.001 {
 		t.Fatalf("SPI capture has only %g seconds after trigger", post)
 	}
-	for _, rate := range []float64{2442, 1e6, 3e6, 4e6, 5e6, 8e6} {
+	for _, rate := range []Frequency{2442 * Hertz, 1 * MegaHertz, 3 * MegaHertz, 4 * MegaHertz, 5 * MegaHertz, 8 * MegaHertz} {
 		c.Rate, c.PreTrigger = rate, 0
 		ticks, _, _, err := bitscopeLogicPlan(c)
-		if err != nil || clockRate/float64(ticks) > rate || ticks < 5 || ticks > 16384 {
-			t.Fatalf("rate %g: ticks=%d %v", rate, ticks, err)
+		if err != nil || clockRate/float64(ticks) > rate.Hz() || ticks < 5 || ticks > 16384 {
+			t.Fatalf("rate %v: ticks=%d %v", rate, ticks, err)
 		}
 	}
 	for name, change := range map[string]func(*Config){
@@ -40,16 +40,15 @@ func TestLogicPlan(t *testing.T) {
 		"source off":     func(c *Config) { c.Source = 2 },
 		"source low":     func(c *Config) { c.Source = -1 },
 		"source high":    func(c *Config) { c.Source = 6 },
-		"rate low":       func(c *Config) { c.Rate = 2000 },
-		"rate high":      func(c *Config) { c.Rate = 10e6 },
-		"rate nan":       func(c *Config) { c.Rate = math.NaN() },
-		"rate inf":       func(c *Config) { c.Rate = math.Inf(1) },
+		"rate low":       func(c *Config) { c.Rate = 2441 * Hertz },
+		"rate high":      func(c *Config) { c.Rate = 8*MegaHertz + 1 },
+		"rate zero":      func(c *Config) { c.Rate = 0 },
 		"few samples":    func(c *Config) { c.Samples = 31 },
 		"buffer":         func(c *Config) { c.Samples = 12289 },
 		"pre negative":   func(c *Config) { c.PreTrigger = -0.1 },
 		"pre high":       func(c *Config) { c.PreTrigger = 1.1 },
 		"pre nan":        func(c *Config) { c.PreTrigger = math.NaN() },
-		"pre fast":       func(c *Config) { c.Rate = 8e6 },
+		"pre fast":       func(c *Config) { c.Rate = 8 * MegaHertz },
 		"auto negative":  func(c *Config) { c.Auto = -time.Second },
 		"auto overflow":  func(c *Config) { c.Auto = time.Second },
 	} {

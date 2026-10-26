@@ -7,7 +7,7 @@ import (
 )
 
 func TestSettingLayout(t *testing.T) {
-	p, err := dslogicPlan(Config{Channels: 1, Rate: 1e6, Samples: 4096})
+	p, err := dslogicPlan(Config{Channels: 1, Rate: 1 * MegaHertz, Samples: 4096})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,35 +53,35 @@ func TestPlan(t *testing.T) {
 		dsoCount uint32
 	}{{
 		name: "1 MHz, 16 inputs, rising L0",
-		cfg:  Config{Channels: 0xffff, Rate: 1e6, Samples: 4096, PreTrigger: 0.05},
+		cfg:  Config{Channels: 0xffff, Rate: 1 * MegaHertz, Samples: 4096, PreTrigger: 0.05},
 		rate: 1e6, mode: modeTrigEn, div: 100,
 		cnt: 4096 >> 4, tpos: 192,
 		mask0: 0xfffe, value0: 1, edge0: 1,
 		enabled: 16, trigGlb: 16 << 8, actual: 4096, dsoCount: 4096,
 	}, {
 		name: "rounds the rate down and the count up",
-		cfg:  Config{Channels: 0x0003, Rate: 3e6, Samples: 1000, Source: 1, Falling: true},
+		cfg:  Config{Channels: 0x0003, Rate: 3 * MegaHertz, Samples: 1000, Source: 1, Falling: true},
 		rate: 100e6 / 34, mode: modeTrigEn | modeSlow, div: 34,
 		cnt: 1024 >> 4, tpos: 64,
 		mask0: 0xfffd, value0: 0, edge0: 2,
 		enabled: 2, trigGlb: 2 << 8, actual: 1024, dsoCount: 1024,
 	}, {
 		name: "100 MHz",
-		cfg:  Config{Channels: 0x00ff, Rate: 100e6, Samples: 1 << 20, PreTrigger: 0.5},
+		cfg:  Config{Channels: 0x00ff, Rate: 100 * MegaHertz, Samples: 1 << 20, PreTrigger: 0.5},
 		rate: 100e6, mode: modeTrigEn, div: 1,
 		cnt: 1 << 16, tpos: 1 << 19,
 		mask0: 0xfffe, value0: 1, edge0: 1,
 		enabled: 8, trigGlb: 8 << 8, actual: 1 << 20, dsoCount: 1 << 20,
 	}, {
 		name: "200 MHz copies the trigger to both bytes",
-		cfg:  Config{Channels: 0x0081, Rate: 200e6, Samples: 4096, Source: 7},
+		cfg:  Config{Channels: 0x0081, Rate: 200 * MegaHertz, Samples: 4096, Source: 7},
 		rate: 200e6, mode: modeTrigEn | modeHalf, div: 1,
 		cnt: 4096 >> 4, tpos: 64,
 		mask0: 0x7f7f, value0: 0x8080, edge0: 0x8080,
 		enabled: 2, trigGlb: 2 << 8, actual: 4096, dsoCount: 4096,
 	}, {
 		name: "400 MHz copies the trigger to all nibbles",
-		cfg:  Config{Channels: 0x000f, Rate: 400e6, Samples: 4096, Source: 2},
+		cfg:  Config{Channels: 0x000f, Rate: 400 * MegaHertz, Samples: 4096, Source: 2},
 		rate: 400e6, mode: modeTrigEn | modeQuar, div: 1,
 		cnt: 4096 >> 4, tpos: 64,
 		mask0: 0xbbbb, value0: 0x4444, edge0: 0x4444,
@@ -130,13 +130,13 @@ func TestPlan(t *testing.T) {
 }
 
 func TestPlanErrors(t *testing.T) {
-	ok := Config{Channels: 1, Rate: 1e6, Samples: 4096}
+	ok := Config{Channels: 1, Rate: 1 * MegaHertz, Samples: 4096}
 	for name, change := range map[string]func(*Config){
 		"no inputs":          func(c *Config) { c.Channels = 0 },
-		"rate too low":       func(c *Config) { c.Rate = 10e3 },
-		"rate too high":      func(c *Config) { c.Rate = 500e6 },
-		"400 MHz with L4":    func(c *Config) { c.Rate, c.Channels = 400e6, 0x11 },
-		"200 MHz with L8":    func(c *Config) { c.Rate, c.Channels = 200e6, 0x101 },
+		"rate too low":       func(c *Config) { c.Rate = 10 * KiloHertz },
+		"rate too high":      func(c *Config) { c.Rate = 500 * MegaHertz },
+		"400 MHz with L4":    func(c *Config) { c.Rate, c.Channels = 400*MegaHertz, 0x11 },
+		"200 MHz with L8":    func(c *Config) { c.Rate, c.Channels = 200*MegaHertz, 0x101 },
 		"trigger not on":     func(c *Config) { c.Source = 3 },
 		"trigger out of set": func(c *Config) { c.Source = 16 },
 		"too few samples":    func(c *Config) { c.Samples = 10 },
@@ -167,7 +167,7 @@ func TestHeader(t *testing.T) {
 	if h.RealPos != 254 || h.Status != 1 {
 		t.Errorf("header %+v", h)
 	}
-	p, _ := dslogicPlan(Config{Channels: 1, Rate: 1e6, Samples: 4096})
+	p, _ := dslogicPlan(Config{Channels: 1, Rate: 1 * MegaHertz, Samples: 4096})
 	if got := h.samples(p); got != 0 {
 		t.Errorf("samples with remain 3903: got %d, want 0", got)
 	}
@@ -183,7 +183,7 @@ func TestHeader(t *testing.T) {
 	if got := h.samples(p); got != 0 {
 		t.Errorf("samples with remain 5000: got %d, want 0", got)
 	}
-	p, _ = dslogicPlan(Config{Channels: 1, Rate: 1e6, Samples: 1000})
+	p, _ = dslogicPlan(Config{Channels: 1, Rate: 1 * MegaHertz, Samples: 1000})
 	h.RemainL = 0
 	if got := h.samples(p); got != 1024 {
 		t.Errorf("samples for a 1000-sample request: got %d, want 1024", got)
