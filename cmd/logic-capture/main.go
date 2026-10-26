@@ -22,7 +22,11 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	device := flags.String("device", "", "analyser, required: "+strings.Join(logic.Devices(), ", "))
 	port := flags.String("port", "", "BitScope serial port (default: search)")
 	threshold := flags.String("threshold", "3.3", "DSLogic input threshold: 3.3 or 5 (volts)")
-	rate := flags.Float64("rate", 4e6, "samples per second: BitScope at most 8000000, DSLogic at most 400000000, FX2 at most 24000000")
+	rate := 4 * logic.MegaHertz
+	flags.Func("rate", "sample rate, such as 4MHz or 4000000 (Hz): BitScope at most 8MHz, DSLogic at most 400MHz, FX2 at most 24MHz (default 4MHz)", func(s string) (err error) {
+		rate, err = logic.ParseFrequency(s)
+		return err
+	})
 	samples := flags.Int("samples", 12000, "sample count: BitScope at most 12288")
 	channels := flags.Uint("channels", 3, "input bit mask: bit n is Ln; BitScope L0 to L5, DSLogic L0 to L15, FX2 L0 to L7")
 	source := flags.Int("trigger", 1, "trigger input number")
@@ -43,7 +47,7 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 		return errors.New("channels must be a 16-bit mask")
 	}
 	cfg := logic.Config{
-		Channels: uint16(*channels), Rate: *rate, Samples: *samples,
+		Channels: uint16(*channels), Rate: rate, Samples: *samples,
 		Source: *source, Falling: *falling, PreTrigger: *pre, Auto: *auto,
 	}
 	set := map[string]bool{}
@@ -123,13 +127,13 @@ func applyPreset(name string, set map[string]bool, device string, cfg *logic.Con
 		cfg.Channels = 0x000f
 	}
 	if !set["rate"] {
-		cfg.Rate = 1e6
+		cfg.Rate = logic.MegaHertz
 	}
 	if !set["samples"] {
-		cfg.Samples = min(int(60*cfg.Rate), logic.DSLogicMaxSamples(bits.OnesCount16(cfg.Channels)))
+		cfg.Samples = min(int(60*cfg.Rate/logic.Hertz), logic.DSLogicMaxSamples(bits.OnesCount16(cfg.Channels)))
 	}
 	if !set["wait"] {
-		capture := time.Duration(float64(cfg.Samples) / cfg.Rate * float64(time.Second))
+		capture := time.Duration(float64(cfg.Samples) / cfg.Rate.Hz() * float64(time.Second))
 		*wait = 2*capture + 30*time.Second
 	}
 	return nil

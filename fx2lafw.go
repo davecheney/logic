@@ -42,9 +42,9 @@ const (
 	fx2Transfers      = 32
 )
 
-var fx2Rates = []float64{
-	20e3, 25e3, 50e3, 100e3, 200e3, 250e3, 500e3,
-	1e6, 2e6, 3e6, 4e6, 6e6, 8e6, 12e6, 16e6, 24e6,
+var fx2Rates = []Frequency{
+	20 * KiloHertz, 25 * KiloHertz, 50 * KiloHertz, 100 * KiloHertz, 200 * KiloHertz, 250 * KiloHertz, 500 * KiloHertz,
+	1 * MegaHertz, 2 * MegaHertz, 3 * MegaHertz, 4 * MegaHertz, 6 * MegaHertz, 8 * MegaHertz, 12 * MegaHertz, 16 * MegaHertz, 24 * MegaHertz,
 }
 
 // FX2 is an eight-channel, 24 MHz Saleae Logic clone. Do not use it with
@@ -197,11 +197,11 @@ func (d *FX2) Close() error {
 // fx2StartCommand returns the CMD_START payload for rate: flags, then the
 // sample delay in clock cycles minus one, big endian. The FX2 counts
 // either a 48 MHz or a 30 MHz clock.
-func fx2StartCommand(rate float64) ([3]byte, error) {
-	r := int(rate)
-	if float64(r) != rate || r <= 0 {
-		return [3]byte{}, fmt.Errorf("fx2lafw: cannot sample at %g S/s", rate)
+func fx2StartCommand(rate Frequency) ([3]byte, error) {
+	if rate%Hertz != 0 || rate == 0 || rate > 48*MegaHertz {
+		return [3]byte{}, fmt.Errorf("fx2lafw: cannot sample at %v", rate)
 	}
+	r := int(rate / Hertz)
 	var flags byte
 	delay := 0
 	if 48_000_000%r == 0 {
@@ -214,7 +214,7 @@ func fx2StartCommand(rate float64) ([3]byte, error) {
 		flags, delay = 0, 30_000_000/r-1
 	}
 	if delay <= 0 || delay > fx2MaxSampleDelay {
-		return [3]byte{}, fmt.Errorf("fx2lafw: cannot sample at %g S/s", rate)
+		return [3]byte{}, fmt.Errorf("fx2lafw: cannot sample at %v", rate)
 	}
 	return [3]byte{flags, byte(delay >> 8), byte(delay)}, nil
 }
@@ -263,7 +263,7 @@ func (d *FX2) CaptureLogic(ctx context.Context, c Config) (*Trace, error) {
 	}
 	// Queue about 10 ms of samples in each transfer, as libsigrok does, so
 	// the host keeps up with the FX2 FIFO.
-	size := (int(c.Rate/100) + 511) &^ 511
+	size := (int(c.Rate/(100*Hertz)) + 511) &^ 511
 	// The firmware can read EP0BUF before the data stage of CMD_START
 	// arrives, and then it uses the previous command's rate. The second
 	// command applies the correct rate. Send both before the stream,
@@ -279,10 +279,10 @@ func (d *FX2) CaptureLogic(ctx context.Context, c Config) (*Trace, error) {
 	}
 	defer func() {
 		fx2Drain(stream)
-		fill := time.Duration(2 * fx2FIFOBytes / c.Rate * float64(time.Second))
+		fill := time.Duration(2 * fx2FIFOBytes / c.Rate.Hz() * float64(time.Second))
 		d.idle = time.Now().Add(fill + 10*time.Millisecond)
 	}()
-	stall := time.Second + 2*time.Duration(float64(size)/c.Rate*float64(time.Second))
+	stall := time.Second + 2*time.Duration(float64(size)/c.Rate.Hz()*float64(time.Second))
 	r := fx2Reader(func(p []byte) (int, error) {
 		rctx, cancel := context.WithTimeout(ctx, stall)
 		defer cancel()
@@ -326,7 +326,7 @@ func fx2Read(ctx context.Context, r io.Reader, c Config) (*Trace, error) {
 	pos, filled, remaining := 0, 0, -1
 	var previous byte
 	var seen int64
-	auto := int64(math.Ceil(c.Auto.Seconds() * c.Rate))
+	auto := int64(math.Ceil(c.Auto.Seconds() * c.Rate.Hz()))
 	triggered := false
 	var buf [32 * 1024]byte
 	for {
@@ -360,7 +360,7 @@ func fx2Read(ctx context.Context, r io.Reader, c Config) (*Trace, error) {
 					slices.Reverse(data[pos:])
 					slices.Reverse(data)
 					return &Trace{
-						Rate: c.Rate, Channels: c.Channels, Source: c.Source,
+						Rate: c.Rate.Hz(), Channels: c.Channels, Source: c.Source,
 						Falling: c.Falling, TriggerAt: pre, Triggered: triggered,
 						Width: 1, Samples: data,
 					}, nil

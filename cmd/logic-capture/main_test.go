@@ -15,7 +15,7 @@ func TestInvalidOptions(t *testing.T) {
 	for _, args := range [][]string{
 		{}, {"-device", "nosuch"},
 		{"-format", "xml"}, {"-channels", "256"}, {"-channels", "0"},
-		{"-rate", "NaN"}, {"-rate", "16000000"}, {"-samples", "16000"},
+		{"-rate", "NaN"}, {"-rate", "16000000"}, {"-rate", "16MHz"}, {"-rate", "4mhz"}, {"-rate", "-1"}, {"-samples", "16000"},
 		{"-trigger", "4"}, {"-wait", "-1s"}, {"unexpected"},
 		{"-preset", "short"}, {"-preset", "long"}, {"-preset", "long", "-device", "bitscope"},
 		{"-preset", "long", "-device", "dslogic", "-channels", "0xffff", "-samples", "20000000"},
@@ -49,13 +49,13 @@ func TestPreset(t *testing.T) {
 	for _, tc := range []struct {
 		set      map[string]bool
 		channels uint16
-		rate     float64
+		rate     logic.Frequency
 		samples  int
 		wait     time.Duration
 	}{
-		{nil, 0x000f, 1e6, 60_000_000, 150 * time.Second},
-		{map[string]bool{"channels": true}, 0xffff, 1e6, 16_777_216, 63554432 * time.Microsecond},
-		{map[string]bool{"rate": true, "wait": true}, 0x000f, 2e6, 67_108_864, time.Second},
+		{nil, 0x000f, logic.MegaHertz, 60_000_000, 150 * time.Second},
+		{map[string]bool{"channels": true}, 0xffff, logic.MegaHertz, 16_777_216, 63554432 * time.Microsecond},
+		{map[string]bool{"rate": true, "wait": true}, 0x000f, 2 * logic.MegaHertz, 67_108_864, time.Second},
 	} {
 		cfg := logic.Config{Channels: tc.channels, Rate: tc.rate, Samples: 12000}
 		wait := time.Second

@@ -13,7 +13,7 @@ import (
 )
 
 func fx2Config() Config {
-	return Config{Channels: 0x81, Rate: 1e6, Samples: 6, Source: 7, PreTrigger: 0.5}
+	return Config{Channels: 0x81, Rate: MegaHertz, Samples: 6, Source: 7, PreTrigger: 0.5}
 }
 
 func TestFX2Validate(t *testing.T) {
@@ -21,7 +21,7 @@ func TestFX2Validate(t *testing.T) {
 	for _, rate := range fx2Rates {
 		c.Rate = rate
 		if err := Validate("fx2lafw", c); err != nil {
-			t.Fatalf("rate %g: %v", rate, err)
+			t.Fatalf("rate %v: %v", rate, err)
 		}
 	}
 	for name, change := range map[string]func(*Config){
@@ -30,10 +30,10 @@ func TestFX2Validate(t *testing.T) {
 		"source":      func(c *Config) { c.Source = 8 },
 		"negative":    func(c *Config) { c.Source = -1 },
 		"disabled":    func(c *Config) { c.Source = 1 },
-		"rate":        func(c *Config) { c.Rate = 5e6 },
-		"too fast":    func(c *Config) { c.Rate = 48e6 },
-		"rate NaN":    func(c *Config) { c.Rate = math.NaN() },
-		"rate Inf":    func(c *Config) { c.Rate = math.Inf(1) },
+		"rate":        func(c *Config) { c.Rate = 5 * MegaHertz },
+		"too fast":    func(c *Config) { c.Rate = 48 * MegaHertz },
+		"rate zero":   func(c *Config) { c.Rate = 0 },
+		"rate mHz":    func(c *Config) { c.Rate = MegaHertz + 1 },
 		"samples":     func(c *Config) { c.Samples = 1 },
 		"pre low":     func(c *Config) { c.PreTrigger = -0.1 },
 		"pre high":    func(c *Config) { c.PreTrigger = 1 },
@@ -54,27 +54,27 @@ func TestFX2Validate(t *testing.T) {
 }
 
 func TestFX2StartCommand(t *testing.T) {
-	for rate, want := range map[float64][3]byte{
-		24e6: {0x40, 0, 1},
-		16e6: {0x40, 0, 2},
-		3e6:  {0x40, 0, 15},
-		1e6:  {0x40, 0, 47},
-		25e3: {0, 0x04, 0xaf},
-		20e3: {0, 0x05, 0xdb},
+	for rate, want := range map[Frequency][3]byte{
+		24 * MegaHertz: {0x40, 0, 1},
+		16 * MegaHertz: {0x40, 0, 2},
+		3 * MegaHertz:  {0x40, 0, 15},
+		1 * MegaHertz:  {0x40, 0, 47},
+		25 * KiloHertz: {0, 0x04, 0xaf},
+		20 * KiloHertz: {0, 0x05, 0xdb},
 	} {
 		got, err := fx2StartCommand(rate)
 		if err != nil || got != want {
-			t.Errorf("rate %g: %x %v, want %x", rate, got, err, want)
+			t.Errorf("rate %v: %x %v, want %x", rate, got, err, want)
 		}
 	}
 	for _, rate := range fx2Rates {
 		if _, err := fx2StartCommand(rate); err != nil {
-			t.Errorf("rate %g: %v", rate, err)
+			t.Errorf("rate %v: %v", rate, err)
 		}
 	}
-	for _, rate := range []float64{48e6, 7e6, 1e3, 0.5, -1, math.NaN()} {
+	for _, rate := range []Frequency{48 * MegaHertz, 7 * MegaHertz, 1 * KiloHertz, 500 * MilliHertz, 0, MegaHertz + 1, 1 << 63} {
 		if _, err := fx2StartCommand(rate); err == nil {
-			t.Errorf("rate %g accepted", rate)
+			t.Errorf("rate %v accepted", rate)
 		}
 	}
 }
@@ -115,7 +115,7 @@ func TestFX2Read(t *testing.T) {
 					t.Fatal(err)
 				}
 				if !bytes.Equal(tr.Samples, tc.want) || tr.TriggerAt != int(tc.pre*6) ||
-					tr.Triggered != tc.triggered || tr.Rate != c.Rate || tr.Channels != c.Channels ||
+					tr.Triggered != tc.triggered || tr.Rate != c.Rate.Hz() || tr.Channels != c.Channels ||
 					tr.Source != c.Source || tr.Falling != c.Falling || tr.Width != 1 {
 					t.Fatalf("trace: %+v, samples %x; want %x", tr, tr.Samples, tc.want)
 				}
