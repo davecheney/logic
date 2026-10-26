@@ -132,7 +132,7 @@ func TestFrequencyFromHz(t *testing.T) {
 		{4e6, 4 * MegaHertz},
 		{400e6, 400 * MegaHertz},
 	} {
-		if got := frequencyFromHz(tc.hz); got != tc.want {
+		if got := FrequencyFromHz(tc.hz); got != tc.want {
 			t.Errorf("%g Hz: got %v, want %v", tc.hz, got, tc.want)
 		}
 	}
@@ -148,7 +148,7 @@ func TestFrequencyDividerRounding(t *testing.T) {
 		{100 * MegaHertz, 1, 2000},
 	} {
 		for div := tc.first; div <= tc.last; div++ {
-			got := frequencyFromHz(tc.clock.Hz() / float64(div))
+			got := FrequencyFromHz(tc.clock.Hz() / float64(div))
 			want := Frequency((uint64(tc.clock) + div/2) / div)
 			if got != want {
 				t.Fatalf("%v / %d: got %v, want %v", tc.clock, div, got, want)

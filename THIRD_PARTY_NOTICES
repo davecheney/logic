@@ -14,7 +14,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 ----
 
-The files in dslogic_firmware are the FX2 firmware and FPGA bitstreams for
+The files in dslogic/firmware are the FX2 firmware and FPGA bitstreams for
 the original DreamSourceLab DSLogic. They are copied without change from
 DSView (https://github.com/DreamSourceLab/DSView), directory DSView/res,
 commit 2e9e2c8e726df4ef5687d39b83d4f797cc44b574.
@@ -42,7 +42,7 @@ and the sigrok project.
 
 ----
 
-fx2lafw_firmware/fx2lafw-saleae-logic.fw is the sigrok fx2lafw firmware
+fx2lafw/firmware/fx2lafw-saleae-logic.fw is the sigrok fx2lafw firmware
 for the Cypress FX2 in eight-channel Saleae Logic clones. It is copied
 without change from the sigrok-firmware-fx2lafw 0.1.7 binary release
 (https://sigrok.org/download/binary/sigrok-firmware-fx2lafw/

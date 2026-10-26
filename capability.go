@@ -10,22 +10,28 @@ import (
 
 var lastDeviceID syncatomic.Uint64
 
-type device struct {
+// Device is one analyser instance. Resource and pin IDs refer to it.
+type Device struct {
 	id    uint64
 	class DeviceClass
 }
 
-func newDevice(class DeviceClass) *device {
-	return &device{id: lastDeviceID.Add(1), class: class}
+// NewDevice returns a device of the given class with a new instance ID.
+// Drivers call it once for each analyser that they open.
+func NewDevice(class DeviceClass) *Device {
+	return &Device{id: lastDeviceID.Add(1), class: class}
 }
 
-func (d *device) Class() DeviceClass { return d.class }
+// Class returns the device class.
+func (d *Device) Class() DeviceClass { return d.class }
 
-func (d *device) resourceID(kind ResourceKind, index uint) ResourceID {
+// ResourceID returns the ID of a resource on d.
+func (d *Device) ResourceID(kind ResourceKind, index uint) ResourceID {
 	return ResourceID{device: d, kind: kind, index: index}
 }
 
-func (d *device) physicalPin(pin uint) PhysicalPin {
+// PhysicalPin returns the ID of a pin on d.
+func (d *Device) PhysicalPin(pin uint) PhysicalPin {
 	return PhysicalPin{device: d, pin: pin}
 }
 
@@ -62,13 +68,13 @@ func (k ResourceKind) Has(mask ResourceKind) bool { return k&mask != 0 }
 // selects the analyser. Class, Kind, and Index group the same resource
 // across analysers of one class.
 type ResourceID struct {
-	device *device
+	device *Device
 	kind   ResourceKind
 	index  uint
 }
 
 // Device returns the analyser that owns the resource.
-func (id ResourceID) Device() *device { return id.device }
+func (id ResourceID) Device() *Device { return id.device }
 
 // Kind returns the resource's role.
 func (id ResourceID) Kind() ResourceKind { return id.kind }
@@ -81,12 +87,12 @@ func (id ResourceID) Index() uint { return id.index }
 // on two analysers of one class, gives different IDs. Resources with the
 // same PhysicalPin use the same hardware signal.
 type PhysicalPin struct {
-	device *device
+	device *Device
 	pin    uint
 }
 
 // Device returns the analyser that owns the pin.
-func (p PhysicalPin) Device() *device { return p.device }
+func (p PhysicalPin) Device() *Device { return p.device }
 
 // Pin returns the pin number.
 func (p PhysicalPin) Pin() uint { return p.pin }
@@ -143,6 +149,12 @@ type CapabilitySet struct {
 	sampleLimits []SampleLimit
 }
 
+// NewCapabilitySet returns a capability set. Drivers use it to describe
+// their resources. It does not copy the slices.
+func NewCapabilitySet(resources []Resource, relations []Relation, sampleLimits []SampleLimit) CapabilitySet {
+	return CapabilitySet{resources: resources, relations: relations, sampleLimits: sampleLimits}
+}
+
 // Resources returns an iterator over the resources in the capability set.
 func (s *CapabilitySet) Resources() iter.Seq[Resource] {
 	return slices.Values(s.resources)
@@ -190,14 +202,14 @@ func (s *CapabilitySet) HasRelation(a, b ResourceID, kind RelationKind) bool {
 	return false
 }
 
-// digitalInputs returns n digital inputs, L0 to Ln-1, on pins 0 to n-1,
+// DigitalInputs returns n digital inputs, L0 to Ln-1, on pins 0 to n-1,
 // with the same rates. Each input can also be the trigger source.
-func digitalInputs(dev *device, n int, min, max Frequency, rates []Frequency) []Resource {
+func DigitalInputs(dev *Device, n int, min, max Frequency, rates []Frequency) []Resource {
 	rs := make([]Resource, n)
 	for i := range rs {
 		rs[i] = Resource{
-			ID:       dev.resourceID(KindDigitalIn, uint(i)),
-			Physical: dev.physicalPin(uint(i)),
+			ID:       dev.ResourceID(KindDigitalIn, uint(i)),
+			Physical: dev.PhysicalPin(uint(i)),
 			Kind:     KindDigitalIn | KindTrigger,
 			Name:     "L" + strconv.Itoa(i),
 			MinHz:    min,

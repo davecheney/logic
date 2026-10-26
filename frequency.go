@@ -36,8 +36,8 @@ var frequencyUnits = []struct {
 // Hz returns f in Hertz.
 func (f Frequency) Hz() float64 { return float64(f) / float64(Hertz) }
 
-// frequencyFromHz rounds a validated device rate to whole milliHertz.
-func frequencyFromHz(hz float64) Frequency {
+// FrequencyFromHz rounds a validated device rate to whole milliHertz.
+func FrequencyFromHz(hz float64) Frequency {
 	return Frequency(math.Round(hz * float64(Hertz)))
 }
 

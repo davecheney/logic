@@ -9,17 +9,6 @@ import (
 	"time"
 )
 
-// logicConfig is the driver-specific view of a digital capture request.
-type logicConfig struct {
-	Channels   uint16
-	Rate       Frequency // requested sample rate; rounded to a device clock step
-	Samples    int
-	Source     int // trigger input
-	Falling    bool
-	PreTrigger float64       // fraction of samples before the trigger
-	Auto       time.Duration // zero waits for a trigger; otherwise permits an auto trace
-}
-
 // CaptureRequest selects digital resources for one capture.
 type CaptureRequest struct {
 	Inputs     []ResourceID
@@ -30,6 +19,16 @@ type CaptureRequest struct {
 	PreTrigger float64
 	Auto       time.Duration
 }
+
+// Waveform is the shape of an AWG output.
+type Waveform string
+
+const (
+	Sine     Waveform = "Sine"
+	Square   Waveform = "Square"
+	Triangle Waveform = "Triangle"
+	Saw      Waveform = "Saw"
+)
 
 // OutputRequest selects an output resource and its requested signal.
 type OutputRequest struct {

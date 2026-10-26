@@ -23,12 +23,17 @@ import (
 	"go.bug.st/serial"
 
 	"github.com/davecheney/logic"
+	"github.com/davecheney/logic/analyzer"
+	"github.com/davecheney/logic/bitscope"
+	"github.com/davecheney/logic/dslogic"
+	"github.com/davecheney/logic/fx2lafw"
+	"github.com/davecheney/logic/ols"
 )
 
 func run(args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("logic-probe", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	device := flags.String("device", "", "analyser, required: "+strings.Join(logic.Devices(), ", "))
+	device := flags.String("device", "", "analyser, required: "+strings.Join(analyzer.Devices(), ", "))
 	port := flags.String("port", "", "BitScope or OLS serial port (default: search)")
 	bauds := flags.String("baud", "460800,115200,230400,921600,57600,19200", "BitScope baud rates to try, in order")
 	wait := flags.Duration("wait", 300*time.Millisecond, "BitScope time to wait for a reply")
@@ -42,7 +47,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	switch *device {
 	case "bitscope":
 		if *port == "" {
-			p, err := logic.FindPort()
+			p, err := bitscope.FindPort()
 			if err != nil {
 				return err
 			}
@@ -50,24 +55,24 @@ func run(args []string, stdout, stderr io.Writer) error {
 		}
 		return probeBitScope(stdout, *port, *bauds, *wait)
 	case "dslogic":
-		th := logic.Threshold3V3
+		th := dslogic.Threshold3V3
 		switch *threshold {
 		case "3.3":
 		case "5":
-			th = logic.Threshold5V
+			th = dslogic.Threshold5V
 		default:
 			return errors.New("threshold must be 3.3 or 5")
 		}
 		return probeDSLogic(stdout, th)
 	case "fx2lafw", "saleae":
-		d, err := logic.OpenFX2()
+		d, err := fx2lafw.Open()
 		if err != nil {
 			return err
 		}
 		fmt.Fprintln(stdout, d)
 		return d.Close()
 	case "ols":
-		d, err := logic.Open(*device, *port, logic.Threshold3V3)
+		d, err := ols.Open(*port)
 		if err != nil {
 			return err
 		}
@@ -86,14 +91,14 @@ func run(args []string, stdout, stderr io.Writer) error {
 		}
 		return d.Close()
 	case "":
-		return fmt.Errorf("-device is required: %s", strings.Join(logic.Devices(), ", "))
+		return fmt.Errorf("-device is required: %s", strings.Join(analyzer.Devices(), ", "))
 	default:
-		return fmt.Errorf("unknown device %q: use %s", *device, strings.Join(logic.Devices(), ", "))
+		return fmt.Errorf("unknown device %q: use %s", *device, strings.Join(analyzer.Devices(), ", "))
 	}
 }
 
-func probeDSLogic(w io.Writer, th logic.Threshold) error {
-	d, err := logic.OpenDSLogic(th)
+func probeDSLogic(w io.Writer, th dslogic.Threshold) error {
+	d, err := dslogic.Open(th)
 	if err != nil {
 		return err
 	}
