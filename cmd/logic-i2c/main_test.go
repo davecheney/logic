@@ -43,7 +43,7 @@ func (b *bus) byte(v byte, nack bool) {
 }
 
 func (b *bus) trace() *logic.Trace {
-	return &logic.Trace{Rate: logic.MegaHertz, Channels: 1<<sda | 1<<scl, Samples: b.s}
+	return &logic.Trace{Rate: logic.MegaHertz, Inputs: logic.NewDevice(logic.ClassFX2).TraceInputs(1<<sda | 1<<scl), Samples: b.s}
 }
 
 func capture(t *testing.T, tr *logic.Trace) *bytes.Buffer {

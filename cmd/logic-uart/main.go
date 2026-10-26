@@ -41,8 +41,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if flags.NArg() != 0 {
 		return errors.New("unexpected arguments")
 	}
-	if c.line < 0 || c.line > 15 {
-		return errors.New("-line is required, 0 to 15")
+	if c.line < 0 || c.line > 63 {
+		return errors.New("-line is required, 0 to 63")
 	}
 	if !(c.baud > 0) {
 		return errors.New("baud must be positive")
@@ -60,8 +60,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if tr.Channels>>c.line&1 == 0 {
-		return fmt.Errorf("L%d is not in the capture (channels %#x)", c.line, tr.Channels)
+	if tr.Mask()>>c.line&1 == 0 {
+		return fmt.Errorf("L%d is not in the capture (channels %#x)", c.line, tr.Mask())
 	}
 	if tr.Rate.Hz()/c.baud < 4 {
 		return fmt.Errorf("%g S/s is too slow for %g baud, capture at least 4 samples a bit", tr.Rate.Hz(), c.baud)

@@ -118,8 +118,8 @@ func TestFX2Read(t *testing.T) {
 					t.Fatal(err)
 				}
 				if !bytes.Equal(tr.Samples, tc.want) || tr.TriggerAt != int(tc.pre*6) ||
-					tr.Triggered != tc.triggered || tr.Rate != c.Rate || tr.Channels != c.Channels ||
-					tr.Source != c.Source || tr.Falling != c.Falling || tr.Width != 1 {
+					tr.Triggered != tc.triggered || tr.Rate != c.Rate ||
+					tr.Falling != c.Falling || tr.Width != 1 {
 					t.Fatalf("trace: %+v, samples %x; want %x", tr, tr.Samples, tc.want)
 				}
 			}

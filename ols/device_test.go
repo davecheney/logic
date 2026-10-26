@@ -111,7 +111,7 @@ func TestOLSCapture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tr.Rate != logic.MegaHertz || tr.Channels != 0xff || tr.Len() != 4 ||
+	if tr.Rate != logic.MegaHertz || tr.Mask() != 0xff || tr.Len() != 4 ||
 		!tr.Triggered || tr.TriggerAt != 0 {
 		t.Fatalf("trace: %+v", tr)
 	}

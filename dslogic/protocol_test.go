@@ -232,7 +232,7 @@ func TestTranspose(t *testing.T) {
 	transpose(dst, src, enabled)
 	tr := logic.Trace{Width: 2, Samples: dst}
 	for i, w := range want {
-		if got := tr.At(i); got != w {
+		if got := tr.At(i); got != uint64(w) {
 			t.Fatalf("sample %d: got %#04x, want %#04x", i, got, w)
 		}
 	}

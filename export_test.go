@@ -5,17 +5,18 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 )
 
 func TestReadWrite(t *testing.T) {
 	for _, tr := range []*Trace{
-		{Rate: MegaHertz, Channels: 3, TriggerAt: 2, Triggered: true, Samples: []byte{0, 1, 3, 2}},
-		{Rate: 100 * MegaHertz, Channels: 0x8001, Width: 2, Samples: []byte{1, 0x80, 0, 0}},
-		{Rate: 2500 * MilliHertz, Channels: 1, Samples: []byte{0, 1}},
-		{Rate: MilliHertz, Channels: 1, Samples: []byte{0, 1}},
-		{Rate: ^Frequency(0), Channels: 1, Samples: []byte{0, 1}},
+		{Rate: MegaHertz, Inputs: NewDevice(ClassFX2).TraceInputs(3), TriggerAt: 2, Triggered: true, Samples: []byte{0, 1, 3, 2}},
+		{Rate: 100 * MegaHertz, Inputs: NewDevice(ClassDSLogic).TraceInputs(0x8001), Width: 2, Samples: []byte{1, 0x80, 0, 0}},
+		{Rate: 2500 * MilliHertz, Inputs: NewDevice(ClassBitScope).TraceInputs(1), Samples: []byte{0, 1}},
+		{Rate: MilliHertz, Inputs: NewDevice(ClassBitScope).TraceInputs(1), Samples: []byte{0, 1}},
+		{Rate: ^Frequency(0), Inputs: NewDevice(ClassBitScope).TraceInputs(1), Samples: []byte{0, 1}},
 	} {
 		var buf bytes.Buffer
 		if err := Write(&buf, "json", tr); err != nil {
@@ -25,7 +26,7 @@ func TestReadWrite(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got.Rate != tr.Rate || got.Channels != tr.Channels || got.TriggerAt != tr.TriggerAt ||
+		if got.Rate != tr.Rate || got.Mask() != tr.Mask() || got.TriggerAt != tr.TriggerAt ||
 			got.Triggered != tr.Triggered || got.Width != tr.Width || !bytes.Equal(got.Samples, tr.Samples) {
 			t.Fatalf("got %+v, want %+v", got, tr)
 		}
@@ -72,6 +73,11 @@ func TestReadInvalid(t *testing.T) {
 		`{"sample_rate":"1Hz","samples":""}`,
 		`{"sample_rate":"1Hz","sample_bytes":3,"samples":"AA=="}`,
 		`{"sample_rate":"1Hz","sample_bytes":2,"samples":"AAAA"}`,
+		`{"sample_rate":"1Hz","sample_bytes":4,"samples":"AAAAAAAA"}`,
+		`{"sample_rate":"1Hz","inputs":[null,null,null,null,null,null,null,null,{"device":1,"index":8}],"samples":"AA=="}`,
+		`{"sample_rate":"1Hz","inputs":[{"device":1,"class":"saleae","index":0}],"samples":"AA=="}`,
+		`{"sample_rate":"1Hz","inputs":[{"device":1,"index":0},{"device":1,"index":0}],"samples":"AA=="}`,
+		`{"sample_rate":"1Hz","inputs":[{"device":1,"class":"fx2lafw","index":0},{"device":1,"class":"dslogic","index":1}],"samples":"AA=="}`,
 	} {
 		if _, err := Read(strings.NewReader(s)); err == nil {
 			t.Errorf("%q: accepted", s)
@@ -80,7 +86,7 @@ func TestReadInvalid(t *testing.T) {
 }
 
 func TestFractionalRateExport(t *testing.T) {
-	tr := &Trace{Rate: 2500 * MilliHertz, Channels: 1, Samples: []byte{0, 1}}
+	tr := &Trace{Rate: 2500 * MilliHertz, Inputs: NewDevice(ClassBitScope).TraceInputs(1), Samples: []byte{0, 1}}
 	var buf bytes.Buffer
 	if err := Write(&buf, "csv", tr); err != nil {
 		t.Fatal(err)
@@ -105,5 +111,90 @@ func TestFractionalRateExport(t *testing.T) {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("VCD missing %q: %s", want, &buf)
 		}
+	}
+}
+
+func TestTraceInputs(t *testing.T) {
+	d := NewDevice(ClassDSLogic)
+	got := d.TraceInputs(0b101)
+	want := []ResourceID{d.ResourceID(KindDigitalIn, 0), {}, d.ResourceID(KindDigitalIn, 2)}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if len(d.TraceInputs(0)) != 0 {
+		t.Fatal("empty mask has inputs")
+	}
+}
+
+func TestTraceWidth(t *testing.T) {
+	for _, tc := range []struct {
+		width int
+		want  uint64
+	}{
+		{0, 0x01}, {1, 0x01}, {2, 0x0201}, {4, 0x04030201}, {8, 0x0807060504030201},
+	} {
+		tr := Trace{Width: tc.width, Samples: []byte{1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0}}
+		if got := tr.At(0); got != tc.want {
+			t.Errorf("width %d: At(0) = %#x, want %#x", tc.width, got, tc.want)
+		}
+		if got, want := tr.Len(), 16/max(tc.width, 1); got != want {
+			t.Errorf("width %d: Len() = %d, want %d", tc.width, got, want)
+		}
+	}
+}
+
+// TestTraceDevices checks that a trace keeps the device of each input
+// when its inputs come from more than one device.
+func TestTraceDevices(t *testing.T) {
+	dsl, bs := NewDevice(ClassDSLogic), NewDevice(ClassBitScope)
+	inputs := append(dsl.TraceInputs(0x8001), bs.ResourceID(KindDigitalIn, 0), ResourceID{}, bs.ResourceID(KindDigitalIn, 2))
+	tr := &Trace{
+		Rate: MegaHertz, Inputs: inputs, Trigger: bs.ResourceID(KindDigitalIn, 2),
+		Width: 4, Samples: []byte{0x01, 0x00, 0x01, 0x00, 0x00, 0x80, 0x04, 0x00},
+	}
+	if got := tr.Mask(); got != 0x58001 {
+		t.Fatalf("Mask() = %#x", got)
+	}
+	if bit, ok := tr.Bit(tr.Trigger); !ok || bit != 18 {
+		t.Fatalf("Bit(trigger) = %d, %t", bit, ok)
+	}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, "json", tr); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Read(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Inputs) != len(tr.Inputs) || got.Mask() != tr.Mask() || got.Width != 4 || got.At(1) != tr.At(1) {
+		t.Fatalf("read %+v", got)
+	}
+	gotDSL, gotBS := got.Inputs[0].Device(), got.Inputs[16].Device()
+	if gotDSL == gotBS || gotDSL.Class() != ClassDSLogic || gotBS.Class() != ClassBitScope ||
+		got.Inputs[15].Device() != gotDSL || got.Inputs[18].Device() != gotBS {
+		t.Fatalf("devices: %v", got.Inputs)
+	}
+	if got.Inputs[15].Index() != 15 || got.Inputs[18].Index() != 2 || got.Trigger != got.Inputs[18] {
+		t.Fatalf("inputs %v, trigger %v", got.Inputs, got.Trigger)
+	}
+
+	buf.Reset()
+	if err := Write(&buf, "csv", tr); err != nil {
+		t.Fatal(err)
+	}
+	r := csv.NewReader(&buf)
+	r.Comment = '#'
+	rows, err := r.ReadAll()
+	if err != nil || strings.Join(rows[0], ",") != "time_seconds,dslogic1.L0,dslogic1.L15,bitscope2.L0,bitscope2.L2" ||
+		strings.Join(rows[1], ",") != "0,1,0,1,0" || strings.Join(rows[2], ",") != "1e-06,0,1,0,1" {
+		t.Fatalf("CSV: %v, %v", rows, err)
+	}
+	buf.Reset()
+	if err := Write(&buf, "vcd", tr); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "$var wire 1 3 bitscope2.L2 $end") {
+		t.Fatalf("VCD:\n%s", &buf)
 	}
 }
