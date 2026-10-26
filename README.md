@@ -11,6 +11,7 @@ Supported analysers:
 | BitScope Micro (BS05) | `bitscope` | L0 to L5 | [bitscope](https://pkg.go.dev/github.com/davecheney/logic/bitscope) |
 | DreamSourceLab DSLogic (original) | `dslogic` | L0 to L15 | [dslogic](https://pkg.go.dev/github.com/davecheney/logic/dslogic) |
 | Open Workbench Logic Sniffer | `ols` | L0 to L15 | [ols](https://pkg.go.dev/github.com/davecheney/logic/ols) |
+| Dangerous Prototypes Logic Pirate | `logicpirate` | L0 to L7 | [logicpirate](https://pkg.go.dev/github.com/davecheney/logic/logicpirate) |
 | Generic Saleae Logic clone (8 channels, 24 MHz) | `fx2lafw` or `saleae` | L0 to L7 | [fx2lafw](https://pkg.go.dev/github.com/davecheney/logic/fx2lafw) |
 
 | Command | Use |
@@ -32,8 +33,9 @@ go install github.com/davecheney/logic/cmd/...@latest
 ```
 
 The DSLogic and the Saleae Logic clone need libusb (`brew install libusb`
-on macOS). The OLS and BitScope need access to the serial port. On Linux,
-see [docs/linux.md](docs/linux.md) for the udev rules and serial port group.
+on macOS). The OLS, BitScope, and Logic Pirate need access to the serial
+port. On Linux, see [docs/linux.md](docs/linux.md) for the udev rules and
+serial port group.
 
 ## Example
 
@@ -45,11 +47,19 @@ logic-capture -device ols -rate 10MHz -samples 12000 \
 
 More examples are in [docs/examples](docs/examples).
 
+For the Logic Pirate, select a fixed firmware rate, an either-edge trigger, and no pre-trigger:
+
+```sh
+logic-probe -device logicpirate
+logic-capture -device logicpirate -rate 2MHz -samples 12000 \
+  -channels 0xff -trigger 0 -any-edge -pre 0 -auto 100ms -output pirate.json
+```
+
 ## Library
 
 Package `logic` holds the capture types and the capability model. The
-drivers are in packages `bitscope`, `dslogic`, `fx2lafw`, and `ols`. Package
-`analyzer` selects a driver by name: `analyzer.Open` opens an analyser,
+drivers are in packages `bitscope`, `dslogic`, `fx2lafw`, `logicpirate`,
+and `ols`. Package `analyzer` selects a driver by name: `analyzer.Open` opens an analyser,
 and `analyzer.Validate` checks a `CaptureRequest` without opening one.
 `logic.Write` writes a `Trace` as JSON, CSV, or VCD. `logic.Read` reads
 the JSON back.

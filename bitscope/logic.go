@@ -113,6 +113,8 @@ func (s *BitScope) validateLogic(c capture.Config) error {
 
 func bitscopeLogicPlan(c capture.Config) (ticks, trigger, timeout int, err error) {
 	switch {
+	case c.AnyEdge:
+		err = errors.New("bitscope: any-edge triggers are not supported")
 	case c.Channels == 0 || c.Channels&^0x3f != 0:
 		err = errors.New("bitscope: select inputs L0 through L5")
 	case c.Source < 0 || c.Source > 5 || c.Channels&(1<<c.Source) == 0:

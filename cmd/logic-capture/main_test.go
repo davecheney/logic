@@ -28,6 +28,10 @@ func TestInvalidOptions(t *testing.T) {
 		{"-trigger", "4"}, {"-wait", "-1s"}, {"unexpected"},
 		{"-preset", "short"}, {"-preset", "long"}, {"-preset", "long", "-device", "bitscope"},
 		{"-preset", "long", "-device", "dslogic", "-channels", "0xffff", "-samples", "20000000"},
+		{"-device", "logicpirate"},
+		{"-device", "logicpirate", "-rate", "2MHz"},
+		{"-device", "logicpirate", "-rate", "2MHz", "-any-edge", "-falling"},
+		{"-device", "bitscope", "-any-edge"},
 	} {
 		if len(args) > 1 && args[0] != "-device" && args[0] != "-preset" {
 			args = append([]string{"-device", "bitscope"}, args...)
@@ -97,6 +101,7 @@ func TestCaptureRequestUsesOLSResources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	req, err := captureRequest(&caps, captureOptions{
 		ChannelMask: 0x0101, Rate: 1 * logic.MegaHertz, Samples: 12000, Source: 8,
 	})
@@ -112,6 +117,26 @@ func TestCaptureRequestUsesOLSResources(t *testing.T) {
 	req.Rate = 101 * logic.MegaHertz
 	if err := analyzer.Validate("ols", req); err == nil {
 		t.Fatal("accepted rate above 100 MHz")
+	}
+}
+
+func TestCaptureRequestUsesLogicPirateResources(t *testing.T) {
+	caps, err := analyzer.CapabilitiesFor("logicpirate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := captureRequest(&caps, captureOptions{
+		ChannelMask: 0x81, Source: 7, Rate: 2 * logic.MegaHertz,
+		Samples: 12000, AnyEdge: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !req.AnyEdge || req.Falling || len(req.Inputs) != 2 || req.Trigger.Index() != 7 {
+		t.Fatalf("request: %+v", req)
+	}
+	if err := analyzer.Validate("logicpirate", req); err != nil {
+		t.Fatal(err)
 	}
 }
 

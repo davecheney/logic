@@ -54,10 +54,11 @@ func (d *Device) PhysicalPin(pin uint) PhysicalPin {
 type DeviceClass uint64
 
 const (
-	ClassBitScope DeviceClass = iota + 1 // bitscope
-	ClassDSLogic                         // dslogic
-	ClassFX2                             // fx2lafw
-	ClassOLS                             // ols
+	ClassBitScope    DeviceClass = iota + 1 // bitscope
+	ClassDSLogic                            // dslogic
+	ClassFX2                                // fx2lafw
+	ClassOLS                                // ols
+	ClassLogicPirate                        // logicpirate
 )
 
 // ResourceKind is a set of roles. A resource can have more than one role.

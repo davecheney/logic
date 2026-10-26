@@ -17,10 +17,22 @@ permit a capture without an edge. `-wait` is the total capture deadline.
 `-wait 0` waits until interrupted. An auto capture has `triggered=false`.
 Do not use it to prove that an expected signal was absent after a trigger.
 
+The Logic Pirate needs `-any-edge`: it triggers on either edge and cannot
+select rising-only or falling-only edges. Do not combine `-any-edge` and
+`-falling`. Other drivers reject `-any-edge`. Select a fixed firmware rate,
+such as `-rate 2MHz`; the default 4 MHz is not supported.
+
+The Logic Pirate also needs `-pre 0`. Its firmware can trigger before the
+pre-trigger buffer fills, so samples before the trigger are not reliable.
+The trigger is the first sample. Its hardware trigger position is
+approximate. An auto timeout starts a new capture without a trigger.
+
 The limits on rate, sample count, and pre-trigger depend on the analyser.
-See the [bitscope](https://pkg.go.dev/github.com/davecheney/logic/bitscope), [dslogic](https://pkg.go.dev/github.com/davecheney/logic/dslogic), and
-[fx2lafw](https://pkg.go.dev/github.com/davecheney/logic/fx2lafw), and
-[ols](https://pkg.go.dev/github.com/davecheney/logic/ols) package documentation.
+See the [bitscope](https://pkg.go.dev/github.com/davecheney/logic/bitscope),
+[dslogic](https://pkg.go.dev/github.com/davecheney/logic/dslogic),
+[fx2lafw](https://pkg.go.dev/github.com/davecheney/logic/fx2lafw),
+[ols](https://pkg.go.dev/github.com/davecheney/logic/ols), and
+[logicpirate](https://pkg.go.dev/github.com/davecheney/logic/logicpirate) package documentation.
 
 `-rate` is a frequency with a unit: `mHz`, `Hz`, `kHz`, `MHz`, or `GHz`.
 The units are case sensitive. A number without a unit is in Hz, so
@@ -33,6 +45,8 @@ An existing output file is not overwritten.
 
 JSON is the default format. It contains `sample_rate`, `inputs`,
 `trigger_channel`, `falling`, `trigger_sample`, `triggered`, and `samples`.
+An either-edge capture also has `"any_edge":true`; `falling` is then false.
+CSV and VCD metadata also record `any_edge=true` for these captures.
 The sample field is a base64 string. Decode it to get one byte per sample.
 If `sample_bytes` is 2, 4, or 8, each sample is a little-endian value of
 that many bytes instead. Element n of `inputs` is the input on bit n of

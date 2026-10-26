@@ -2,12 +2,14 @@ package analyzer
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davecheney/logic"
 	"github.com/davecheney/logic/bitscope"
 	"github.com/davecheney/logic/dslogic"
 	"github.com/davecheney/logic/fx2lafw"
+	"github.com/davecheney/logic/logicpirate"
 	"github.com/davecheney/logic/ols"
 )
 
@@ -16,6 +18,7 @@ var (
 	_ logic.Analyzer = (*dslogic.DSLogic)(nil)
 	_ logic.Analyzer = (*fx2lafw.FX2)(nil)
 	_ logic.Analyzer = (*ols.OLS)(nil)
+	_ logic.Analyzer = (*logicpirate.LogicPirate)(nil)
 )
 
 func TestCapabilityInvariants(t *testing.T) {
@@ -123,6 +126,9 @@ func TestCapabilitySampleLimits(t *testing.T) {
 		{"DSLogic sixteen inputs", "dslogic", 16, 16_777_216, true},
 		{"DSLogic no inputs", "dslogic", 0, 0, false},
 		{"FX2 has no reported limit", "fx2lafw", 8, 0, false},
+		{"Logic Pirate one input", "logicpirate", 1, 245760, true},
+		{"Logic Pirate eight inputs", "logicpirate", 8, 245760, true},
+		{"Logic Pirate nine inputs", "logicpirate", 9, 0, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -144,6 +150,7 @@ func TestValidate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	l0 := slices.Collect(caps.Resources())[0].ID
 	req := logic.CaptureRequest{Inputs: []logic.ResourceID{l0}, Trigger: l0, Rate: logic.MegaHertz, Samples: 4096}
 	if err := Validate("fx2lafw", req); err != nil {
@@ -157,5 +164,26 @@ func TestValidate(t *testing.T) {
 	}
 	if err := Validate("nope", req); err == nil {
 		t.Fatal("unknown device accepted")
+	}
+}
+
+func TestAnyEdgeValidation(t *testing.T) {
+	for _, name := range Devices() {
+		caps, err := CapabilitiesFor(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id := slices.Collect(caps.Resources())[0].ID
+		req := logic.CaptureRequest{
+			Inputs: []logic.ResourceID{id}, Trigger: id, Rate: logic.MegaHertz,
+			Samples: 4096, AnyEdge: true,
+		}
+		err = Validate(name, req)
+		if name == "logicpirate" && err != nil {
+			t.Fatalf("Logic Pirate rejected any-edge: %v", err)
+		}
+		if name != "logicpirate" && (err == nil || !strings.Contains(err.Error(), "any-edge")) {
+			t.Fatalf("%s: want unsupported any-edge error, got %v", name, err)
+		}
 	}
 }

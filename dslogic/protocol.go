@@ -115,6 +115,8 @@ func DSLogicMaxSamples(inputs int) int { return depth(inputs) }
 func dslogicPlan(c capture.Config) (*acquisition, error) {
 	n := bits.OnesCount16(c.Channels)
 	switch {
+	case c.AnyEdge:
+		return nil, errors.New("dslogic: any-edge triggers are not supported")
 	case c.Channels == 0:
 		return nil, errors.New("dslogic: select at least one input")
 	case c.Rate < minRate || c.Rate > quarterRate:

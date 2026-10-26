@@ -9,7 +9,7 @@ import (
 // Request returns a request for the digital inputs of a that c selects.
 func Request(a logic.Analyzer, c capture.Config) logic.CaptureRequest {
 	req := logic.CaptureRequest{
-		Rate: c.Rate, Samples: c.Samples, Falling: c.Falling,
+		Rate: c.Rate, Samples: c.Samples, Falling: c.Falling, AnyEdge: c.AnyEdge,
 		PreTrigger: c.PreTrigger, Auto: c.Auto,
 	}
 	caps := a.Capabilities()

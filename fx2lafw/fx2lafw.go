@@ -261,6 +261,8 @@ func Validate(dev *logic.Device, req logic.CaptureRequest) error {
 
 func (d *FX2) validateLogic(c capture.Config) error {
 	switch {
+	case c.AnyEdge:
+		return errors.New("fx2lafw: any-edge triggers are not supported")
 	case c.Channels == 0 || c.Channels&^0xff != 0:
 		return errors.New("fx2lafw: select inputs L0 through L7")
 	case c.Source < 0 || c.Source > 7 || c.Channels&(1<<c.Source) == 0:

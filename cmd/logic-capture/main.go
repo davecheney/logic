@@ -26,6 +26,7 @@ type captureOptions struct {
 	Samples     int
 	Source      int
 	Falling     bool
+	AnyEdge     bool
 	PreTrigger  float64
 	Auto        time.Duration
 }
@@ -34,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	flags := flag.NewFlagSet("logic-capture", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	device := flags.String("device", "", "analyser, required: "+strings.Join(analyzer.Devices(), ", "))
-	port := flags.String("port", "", "BitScope or OLS serial port (default: search)")
+	port := flags.String("port", "", "BitScope, OLS, or Logic Pirate serial port (default: search)")
 	threshold := flags.String("threshold", "3.3", "DSLogic input threshold: 3.3 or 5 (volts)")
 	rate := 4 * logic.MegaHertz
 	flags.Func("rate", "sample rate, such as 4MHz or 4000000 (Hz); supported rates depend on the analyser (default 4MHz)", func(s string) (err error) {
@@ -45,6 +46,7 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	channels := flags.Uint("channels", 3, "digital input bit mask; bit n selects input n")
 	source := flags.Int("trigger", 1, "trigger input number")
 	falling := flags.Bool("falling", false, "trigger on a falling edge")
+	anyEdge := flags.Bool("any-edge", false, "trigger on either edge (Logic Pirate only); cannot combine with -falling")
 	pre := flags.Float64("pre", 0.05, "fraction of samples before the trigger")
 	auto := flags.Duration("auto", 0, "auto trigger wait (0 waits for an edge)")
 	wait := flags.Duration("wait", 10*time.Second, "overall capture deadline (0 waits until interrupted)")
@@ -59,7 +61,7 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	}
 	cfg := captureOptions{
 		ChannelMask: *channels, Rate: rate, Samples: *samples,
-		Source: *source, Falling: *falling, PreTrigger: *pre, Auto: *auto,
+		Source: *source, Falling: *falling, AnyEdge: *anyEdge, PreTrigger: *pre, Auto: *auto,
 	}
 	set := map[string]bool{}
 	flags.Visit(func(f *flag.Flag) { set[f.Name] = true })
@@ -143,7 +145,7 @@ type resourceCapabilities interface {
 
 func captureRequest(caps resourceCapabilities, options captureOptions) (logic.CaptureRequest, error) {
 	req := logic.CaptureRequest{
-		Rate: options.Rate, Samples: options.Samples, Falling: options.Falling,
+		Rate: options.Rate, Samples: options.Samples, Falling: options.Falling, AnyEdge: options.AnyEdge,
 		PreTrigger: options.PreTrigger, Auto: options.Auto,
 	}
 	selectedInputs := make(map[uint]logic.ResourceID)
