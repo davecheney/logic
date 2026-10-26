@@ -11,7 +11,7 @@ import (
 // trace has L0 and L1 at 1 MS/s with the trigger at sample 2.
 func trace(t *testing.T) *bytes.Buffer {
 	t.Helper()
-	tr := &logic.Trace{Rate: logic.MegaHertz, Channels: 3, TriggerAt: 2, Triggered: true,
+	tr := &logic.Trace{Rate: logic.MegaHertz, Inputs: logic.NewDevice(logic.ClassFX2).TraceInputs(3), TriggerAt: 2, Triggered: true,
 		Samples: []byte{0, 1, 1, 3, 3, 2, 0}}
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(tr); err != nil {

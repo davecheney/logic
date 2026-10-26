@@ -368,7 +368,10 @@ func (d *DSLogic) captureLogic(ctx context.Context, c capture.Config) (*logic.Tr
 		samples = samples[:2*p.limit]
 	}
 	tr := &logic.Trace{
-		Rate: logic.FrequencyFromHz(p.rate), Channels: c.Channels, Source: c.Source, Falling: c.Falling,
+		Rate:      logic.FrequencyFromHz(p.rate),
+		Inputs:    d.device.TraceInputs(uint64(c.Channels)),
+		Trigger:   d.device.ResourceID(logic.KindDigitalIn, uint(c.Source)),
+		Falling:   c.Falling,
 		Triggered: !auto && h.Status&1 != 0, Width: 2, Samples: samples,
 	}
 	if tr.Triggered {

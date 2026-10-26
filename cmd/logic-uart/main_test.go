@@ -42,7 +42,7 @@ func (l *line) text(s string) {
 }
 
 func (l *line) trace() *logic.Trace {
-	return &logic.Trace{Rate: 8 * logic.KiloHertz, Channels: 1 << 2, TriggerAt: 8, Samples: l.s}
+	return &logic.Trace{Rate: 8 * logic.KiloHertz, Inputs: logic.NewDevice(logic.ClassFX2).TraceInputs(1 << 2), TriggerAt: 8, Samples: l.s}
 }
 
 func TestFractionalRate(t *testing.T) {

@@ -277,7 +277,13 @@ func (d *OLS) captureLogic(ctx context.Context, c capture.Config) (*logic.Trace,
 	} else if err := readOLSFull(ctx, d.port, raw); err != nil {
 		return nil, d.abort(fmt.Errorf("ols: read capture: %w", err))
 	}
-	return p.trace(c, raw, triggered)
+	tr, err := p.trace(c, raw, triggered)
+	if err != nil {
+		return nil, err
+	}
+	tr.Inputs = d.device.TraceInputs(uint64(c.Channels))
+	tr.Trigger = d.device.ResourceID(logic.KindDigitalIn, uint(c.Source))
+	return tr, nil
 }
 
 func (d *OLS) abort(cause error) error {

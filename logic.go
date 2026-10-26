@@ -5,7 +5,9 @@ package logic
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -39,35 +41,60 @@ type OutputRequest struct {
 	Waveform  Waveform
 }
 
-// Trace holds packed samples. Bit n of a sample is the state of Ln.
-// Width is the number of bytes in each sample: zero or one for L0 through
-// L7, or two (little endian) for L0 through L15. JSON encodes Samples as
-// base64. Rate is the actual sample rate, rounded to the nearest milliHertz.
+// Trace holds packed samples. Bit n of a sample is the state of Inputs[n].
+// A zero ResourceID in Inputs marks a bit that holds no input. The inputs
+// can be on more than one device. Width is the number of bytes in each
+// little-endian sample: zero or one, two, four, or eight. Trigger is the
+// input that started the capture. Rate is the actual sample rate, rounded
+// to the nearest milliHertz.
 type Trace struct {
-	Rate      Frequency `json:"sample_rate"`
-	Channels  uint16    `json:"channels"`
-	Source    int       `json:"trigger_channel"`
-	Falling   bool      `json:"falling"`
-	TriggerAt int       `json:"trigger_sample"`
-	Triggered bool      `json:"triggered"`
-	Width     int       `json:"sample_bytes,omitempty"`
-	Samples   []byte    `json:"samples"`
+	Rate      Frequency
+	Inputs    []ResourceID
+	Trigger   ResourceID
+	Falling   bool
+	TriggerAt int
+	Triggered bool
+	Width     int
+	Samples   []byte
 }
+
+func (t *Trace) width() int { return max(t.Width, 1) }
 
 // Len returns the number of samples.
-func (t *Trace) Len() int {
-	if t.Width == 2 {
-		return len(t.Samples) / 2
-	}
-	return len(t.Samples)
-}
+func (t *Trace) Len() int { return len(t.Samples) / t.width() }
 
 // At returns sample i.
-func (t *Trace) At(i int) uint16 {
-	if t.Width == 2 {
-		return uint16(t.Samples[2*i]) | uint16(t.Samples[2*i+1])<<8
+func (t *Trace) At(i int) uint64 {
+	switch t.width() {
+	case 1:
+		return uint64(t.Samples[i])
+	case 2:
+		return uint64(binary.LittleEndian.Uint16(t.Samples[2*i:]))
+	case 4:
+		return uint64(binary.LittleEndian.Uint32(t.Samples[4*i:]))
+	default:
+		return binary.LittleEndian.Uint64(t.Samples[8*i:])
 	}
-	return uint16(t.Samples[i])
+}
+
+// Mask returns the sample bits that hold an input.
+func (t *Trace) Mask() uint64 {
+	var mask uint64
+	for bit, id := range t.Inputs {
+		if id != (ResourceID{}) {
+			mask |= 1 << bit
+		}
+	}
+	return mask
+}
+
+// Bit returns the sample bit that holds id.
+func (t *Trace) Bit(id ResourceID) (int, bool) {
+	if id == (ResourceID{}) {
+		return 0, false
+	}
+	bit := slices.Index(t.Inputs, id)
+	return bit, bit >= 0
 }
 
 // Analyzer is an open logic analyser. String returns the device ID.

@@ -85,13 +85,13 @@ func TestLogicCapture(t *testing.T) {
 					return cmd
 				}
 			}}
-			s := &BitScope{name: "BS000500", vm: vm{port: p, timeout: time.Second}}
+			s := &BitScope{name: "BS000500", device: logic.NewDevice(logic.ClassBitScope), vm: vm{port: p, timeout: time.Second}}
 			tr, err := s.captureLogic(context.Background(), c)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if tr.Rate != 4*logic.MegaHertz || tr.TriggerAt != 1 || tr.Triggered != (status == "00") ||
-				tr.Channels != 3 || tr.Source != 1 || !tr.Falling || len(tr.Samples) != 32 {
+				tr.Mask() != 3 || tr.Trigger != s.device.ResourceID(logic.KindDigitalIn, 1) || !tr.Falling || len(tr.Samples) != 32 {
 				t.Fatalf("trace: %+v", tr)
 			}
 			for i, sample := range tr.Samples {
@@ -200,7 +200,8 @@ func TestLogicCancellation(t *testing.T) {
 }
 
 func TestLogicExport(t *testing.T) {
-	tr := &logic.Trace{Rate: 4 * logic.MegaHertz, Channels: 3, Source: 1, TriggerAt: 1, Triggered: true, Samples: []byte{0, 1, 3, 2}}
+	dev := logic.NewDevice(logic.ClassBitScope)
+	tr := &logic.Trace{Rate: 4 * logic.MegaHertz, Inputs: dev.TraceInputs(3), Trigger: dev.ResourceID(logic.KindDigitalIn, 1), TriggerAt: 1, Triggered: true, Samples: []byte{0, 1, 3, 2}}
 	var b bytes.Buffer
 	if err := logic.Write(&b, "json", tr); err != nil {
 		t.Fatal(err)

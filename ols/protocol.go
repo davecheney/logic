@@ -268,7 +268,7 @@ func (p *olsCapture) trace(c capture.Config, raw []byte, triggered bool) (*logic
 		triggerAt = p.triggerAt
 	}
 	return &logic.Trace{
-		Rate: p.rate, Channels: c.Channels, Source: c.Source, Falling: c.Falling,
+		Rate: p.rate, Falling: c.Falling,
 		TriggerAt: min(triggerAt, p.samples-1), Triggered: triggered,
 		Width: width, Samples: out,
 	}, nil

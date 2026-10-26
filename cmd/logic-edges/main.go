@@ -18,7 +18,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("logic-edges", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	input := flags.String("input", "-", "logic-capture JSON file, or - for stdin")
-	channels := flags.Uint("channels", 0, "input bit mask: bit n is Ln (default: all inputs in the capture)")
+	channels := flags.Uint64("channels", 0, "input bit mask: bit n is Ln (default: all inputs in the capture)")
 	from := flags.Duration("from", 0, "window start relative to the trigger, for example -100us (default: first sample)")
 	to := flags.Duration("to", 0, "window end relative to the trigger (default: last sample)")
 	limit := flags.Int("limit", 0, "stop after this many edges (0 lists all)")
@@ -28,9 +28,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if flags.NArg() != 0 {
 		return errors.New("unexpected arguments")
 	}
-	if *channels > 0xffff {
-		return errors.New("channels must be a 16-bit mask")
-	}
 	if *limit < 0 {
 		return errors.New("limit must not be negative")
 	}
@@ -38,12 +35,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	mask := uint16(*channels)
+	mask := *channels
 	if mask == 0 {
-		mask = tr.Channels
+		mask = tr.Mask()
 	}
-	if mask&^tr.Channels != 0 {
-		return fmt.Errorf("channels %#x are not all in the capture (%#x)", mask, tr.Channels)
+	if mask&^tr.Mask() != 0 {
+		return fmt.Errorf("channels %#x are not all in the capture (%#x)", mask, tr.Mask())
 	}
 
 	set := map[string]bool{}
@@ -61,7 +58,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 
 	w := bufio.NewWriter(stdout)
 	var levels []string
-	for ch := range 16 {
+	for ch := range 64 {
 		if mask>>ch&1 != 0 {
 			levels = append(levels, fmt.Sprintf("L%d=%d", ch, tr.At(lo)>>ch&1))
 		}

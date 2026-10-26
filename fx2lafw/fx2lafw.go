@@ -346,6 +346,8 @@ func (d *FX2) captureLogic(ctx context.Context, c capture.Config) (*logic.Trace,
 		}
 		return nil, fmt.Errorf("fx2lafw: capture: %w", err)
 	}
+	tr.Inputs = d.device.TraceInputs(uint64(c.Channels))
+	tr.Trigger = d.device.ResourceID(logic.KindDigitalIn, uint(c.Source))
 	return tr, nil
 }
 
@@ -407,7 +409,7 @@ func fx2Read(ctx context.Context, r io.Reader, c capture.Config) (*logic.Trace, 
 					slices.Reverse(data[pos:])
 					slices.Reverse(data)
 					return &logic.Trace{
-						Rate: c.Rate, Channels: c.Channels, Source: c.Source,
+						Rate:    c.Rate,
 						Falling: c.Falling, TriggerAt: pre, Triggered: triggered,
 						Width: 1, Samples: data,
 					}, nil
