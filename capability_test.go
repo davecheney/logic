@@ -56,6 +56,7 @@ var capabilityTables = []struct {
 	{ClassBitScope, bitscopeCapabilities},
 	{ClassDSLogic, dslogicCapabilities},
 	{ClassFX2, fx2Capabilities},
+	{ClassOLS, olsCapabilities},
 }
 
 func TestCapabilityInvariants(t *testing.T) {

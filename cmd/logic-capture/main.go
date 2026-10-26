@@ -32,7 +32,7 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	flags := flag.NewFlagSet("logic-capture", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	device := flags.String("device", "", "analyser, required: "+strings.Join(logic.Devices(), ", "))
-	port := flags.String("port", "", "BitScope serial port (default: search)")
+	port := flags.String("port", "", "BitScope or OLS serial port (default: search)")
 	threshold := flags.String("threshold", "3.3", "DSLogic input threshold: 3.3 or 5 (volts)")
 	rate := 4 * logic.MegaHertz
 	flags.Func("rate", "sample rate, such as 4MHz or 4000000 (Hz); supported rates depend on the analyser (default 4MHz)", func(s string) (err error) {

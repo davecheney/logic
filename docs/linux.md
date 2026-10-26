@@ -34,9 +34,11 @@ same. Without the rule, the tools fail with `libusb: bad access`.
 
 ## BitScope
 
-The BitScope is a USB serial port. Add your user to the group that owns
-serial ports, `dialout` on Debian and Ubuntu or `uucp` on Arch, then log
-in again:
+## Serial ports
+
+The BitScope and OLS use USB serial ports. Add your user to the group that
+owns serial ports, `dialout` on Debian and Ubuntu or `uucp` on Arch, then
+log in again:
 
 ```sh
 sudo usermod -aG dialout $USER
