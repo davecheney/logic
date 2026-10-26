@@ -63,39 +63,29 @@ const fx2FIFOBytes = 4 * 1024
 
 // Open finds the Saleae Logic clone and loads the fx2lafw firmware if
 // necessary. The firmware goes into RAM; the EEPROM does not change.
-func Open() (_ *FX2, err error) {
+func Open() (*FX2, error) {
 	ctx := gousb.NewContext()
-	defer func() {
-		if err != nil {
-			ctx.Close()
-		}
-	}()
 	dev, err := fx2Find(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, ctx.Close())
 	}
 	d := &FX2{ctx: ctx, dev: dev, device: logic.NewDevice(logic.ClassFX2)}
-	defer func() {
-		if err != nil {
-			d.closeUSB()
-		}
-	}()
 	dev.ControlTimeout = 3 * time.Second
 	if d.cfg, err = dev.Config(1); err != nil {
-		return nil, fmt.Errorf("fx2lafw: config: %w", err)
+		return nil, errors.Join(fmt.Errorf("fx2lafw: config: %w", err), d.closeUSB())
 	}
 	if d.intf, err = d.cfg.Interface(0, 0); err != nil {
-		return nil, fmt.Errorf("fx2lafw: claim interface: %w", err)
+		return nil, errors.Join(fmt.Errorf("fx2lafw: claim interface: %w", err), d.closeUSB())
 	}
 	if d.in, err = d.intf.InEndpoint(fx2Endpoint); err != nil {
-		return nil, fmt.Errorf("fx2lafw: endpoint: %w", err)
+		return nil, errors.Join(fmt.Errorf("fx2lafw: endpoint: %w", err), d.closeUSB())
 	}
 	var fw [2]byte
 	if n, err := dev.Control(ezusb.VendorIn, fx2CmdGetFWVersion, 0, 0, fw[:]); err != nil || n != len(fw) {
-		return nil, fmt.Errorf("fx2lafw: firmware version: %d bytes, %v", n, err)
+		return nil, errors.Join(fmt.Errorf("fx2lafw: firmware version: %d bytes, %v", n, err), d.closeUSB())
 	}
 	if fw[0] != fx2FWMajor {
-		return nil, fmt.Errorf("fx2lafw: firmware version %d.%d, want %d.x", fw[0], fw[1], fx2FWMajor)
+		return nil, errors.Join(fmt.Errorf("fx2lafw: firmware version %d.%d, want %d.x", fw[0], fw[1], fx2FWMajor), d.closeUSB())
 	}
 	d.ID = fmt.Sprintf("Saleae Logic clone %04x:%04x, fx2lafw %d.%d", fx2VendorID, fx2ProductID, fw[0], fw[1])
 	return d, nil

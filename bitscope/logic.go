@@ -74,7 +74,8 @@ func Capabilities(dev *logic.Device) logic.CapabilitySet {
 
 // scopeRateRange returns the slowest and fastest analog sample rates for
 // one channel in the trace modes.
-func scopeRateRange() (min, max logic.Frequency) {
+func scopeRateRange() (logic.Frequency, logic.Frequency) {
+	var min, max logic.Frequency
 	clockRateMilliHz := logic.Frequency(clockRate) * logic.Hertz
 	for _, m := range modes {
 		if m.channels != 1 {
@@ -111,7 +112,9 @@ func (s *BitScope) validateLogic(c capture.Config) error {
 	return err
 }
 
-func bitscopeLogicPlan(c capture.Config) (ticks, trigger, timeout int, err error) {
+func bitscopeLogicPlan(c capture.Config) (int, int, int, error) {
+	var ticks, trigger, timeout int
+	var err error
 	switch {
 	case c.AnyEdge:
 		err = errors.New("bitscope: any-edge triggers are not supported")
@@ -129,24 +132,24 @@ func bitscopeLogicPlan(c capture.Config) (ticks, trigger, timeout int, err error
 		err = errors.New("bitscope: auto timeout must not be negative")
 	}
 	if err != nil {
-		return
+		return ticks, trigger, timeout, err
 	}
 	ticks = int(math.Ceil(clockRate / c.Rate.Hz()))
 	trigger = int(float64(c.Samples) * c.PreTrigger)
 	if c.PreTrigger > 0 && clockRate/float64(ticks) > maxPreTrigger {
 		err = errors.New("bitscope: pre-trigger logic capture requires at most 5000000 S/s")
-		return
+		return ticks, trigger, timeout, err
 	}
 	if c.Auto > 0 {
 		capture := float64(max(0, c.Samples-trigger-2)+6) * float64(ticks) / clockRate
 		t := math.Ceil((capture + c.Auto.Seconds()) / timeoutPeriod)
 		if t > maxTimeout {
 			err = errors.New("bitscope: logic capture and auto timeout exceed the 419 ms timer limit")
-			return
+			return ticks, trigger, timeout, err
 		}
 		timeout = int(t)
 	}
-	return
+	return ticks, trigger, timeout, nil
 }
 
 // CaptureLogic captures the requested digital inputs at the same time.

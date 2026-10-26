@@ -36,7 +36,9 @@ func (s *BitScope) ConfigureAWG(req logic.OutputRequest) (logic.Frequency, error
 	return logic.FrequencyFromHz(actual), nil
 }
 
-func awgTiming(frequency float64) (ticks, size int, actual float64, err error) {
+func awgTiming(frequency float64) (int, int, float64, error) {
+	var ticks, size int
+	var actual float64
 	if math.IsNaN(frequency) || math.IsInf(frequency, 0) || frequency < 10 || frequency > 10000 {
 		return 0, 0, 0, errors.New("bitscope: AWG frequency must be between 10 and 10000 Hz")
 	}
@@ -54,7 +56,7 @@ func awgTiming(frequency float64) (ticks, size int, actual float64, err error) {
 	if size == 0 {
 		return 0, 0, 0, errors.New("bitscope: no AWG clock setting")
 	}
-	return
+	return ticks, size, actual, nil
 }
 
 func waveValue(w logic.Waveform, phase float64) (float64, error) {
