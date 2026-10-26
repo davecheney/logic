@@ -91,6 +91,29 @@ func TestCaptureRequestUsesResourceRoles(t *testing.T) {
 	}
 }
 
+func TestCaptureRequestUsesOLSResources(t *testing.T) {
+	caps, err := logic.CapabilitiesFor("ols")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := captureRequest(&caps, captureOptions{
+		ChannelMask: 0x0101, Rate: 1 * logic.MegaHertz, Samples: 12000, Source: 8,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(req.Inputs) != 2 || req.Trigger.Index() != 8 {
+		t.Fatalf("request: %+v", req)
+	}
+	if err := logic.Validate("ols", req); err != nil {
+		t.Fatalf("validate OLS request: %v", err)
+	}
+	req.Rate = 101 * logic.MegaHertz
+	if err := logic.Validate("ols", req); err == nil {
+		t.Fatal("accepted rate above 100 MHz")
+	}
+}
+
 func TestPreset(t *testing.T) {
 	for _, tc := range []struct {
 		set      map[string]bool

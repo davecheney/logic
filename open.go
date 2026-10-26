@@ -52,6 +52,13 @@ var drivers = []driver{
 		capabilities: fx2Capabilities,
 		validate:     (&FX2{}).validateLogic,
 	},
+	{
+		name:         "ols",
+		class:        ClassOLS,
+		open:         func(port string, _ Threshold) (Analyzer, error) { return OpenOLS(port) },
+		capabilities: olsCapabilities,
+		validate:     validateOLSLogic,
+	},
 }
 
 // Devices returns the names that Open accepts.
@@ -75,8 +82,8 @@ func lookup(name string) (driver, error) {
 	return driver{}, fmt.Errorf("logic: unknown device %q: use %s", name, strings.Join(Devices(), ", "))
 }
 
-// Open opens the named analyser. port selects the BitScope serial port, or
-// searches for one when empty. th selects the DSLogic input threshold.
+// Open opens the named analyser. port selects a serial port for the BitScope
+// or OLS, or searches for one when empty. th selects the DSLogic threshold.
 func Open(name, port string, th Threshold) (Analyzer, error) {
 	d, err := lookup(name)
 	if err != nil {

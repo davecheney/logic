@@ -38,6 +38,7 @@ const (
 	ClassBitScope DeviceClass = iota + 1 // bitscope
 	ClassDSLogic                         // dslogic
 	ClassFX2                             // fx2lafw
+	ClassOLS                             // ols
 )
 
 // ResourceKind is a set of roles. A resource can have more than one role.

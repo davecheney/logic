@@ -10,6 +10,7 @@ Supported analysers:
 |---|---|---|---|
 | BitScope Micro (BS05) | `bitscope` | L0 to L5 | [docs/bitscope.md](docs/bitscope.md) |
 | DreamSourceLab DSLogic (original) | `dslogic` | L0 to L15 | [docs/dslogic.md](docs/dslogic.md) |
+| Open Workbench Logic Sniffer | `ols` | L0 to L15 | [docs/ols.md](docs/ols.md) |
 | Generic Saleae Logic clone (8 channels, 24 MHz) | `fx2lafw` or `saleae` | L0 to L7 | [docs/fx2lafw.md](docs/fx2lafw.md) |
 
 | Command | Use |
@@ -31,26 +32,27 @@ go install github.com/davecheney/logic/cmd/...@latest
 ```
 
 The DSLogic and the Saleae Logic clone need libusb (`brew install libusb`
-on macOS). On Linux, see [docs/linux.md](docs/linux.md) for the udev rules
-and serial port group.
+on macOS). The OLS and BitScope need access to the serial port. On Linux,
+see [docs/linux.md](docs/linux.md) for the udev rules and serial port group.
 
 ## Example
 
 ```sh
-logic-probe -device dslogic
-logic-capture -device dslogic -rate 10000000 -samples 65536 \
-  -channels 0xf -trigger 0 -auto 100ms -format vcd -output capture.vcd
+logic-probe -device ols
+logic-capture -device ols -rate 10MHz -samples 12000 \
+  -channels 0xf -trigger 0 -pre 0.05 -format vcd -output capture.vcd
 ```
 
 More examples are in [docs/examples](docs/examples).
 
 ## Library
 
-Package `logic` holds the drivers and the capture types. `Open` opens an
-analyser by name, `Validate` checks a `Config` without opening one, and
-`Write` writes a `Trace` as JSON, CSV, or VCD. `Read` reads the JSON back.
+Package `logic` holds the drivers and capture types. `Open` opens an
+analyser by name. `CapabilitiesFor` reports a device's resources without
+opening it. `ValidateCapture` checks a request on an open analyser.
+`Write` writes a `Trace` as JSON, CSV, or VCD. `Read` reads JSON captures.
 
-`Config.Rate` and `Trace.Rate` use `Frequency`, stored in milliHertz.
+`CaptureRequest.Rate` and `Trace.Rate` use `Frequency`, stored in milliHertz.
 For example, use `4 * logic.MegaHertz` for 4 MHz, or `rate.Hz()` when a
 calculation needs Hertz as a `float64`. Actual digital trace rates are
 rounded to the nearest milliHertz.

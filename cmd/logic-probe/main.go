@@ -5,6 +5,7 @@
 // prints the replies. The BS05 uses an FT245R. This chip is a USB to
 // parallel FIFO, not a UART, so the device ignores the baud rate.
 //
+// For an OLS it prints the device identity and supported capture limits.
 // For a DSLogic it loads the firmware and prints the FPGA status and HDL
 // version.
 package main
@@ -28,7 +29,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("logic-probe", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	device := flags.String("device", "", "analyser, required: "+strings.Join(logic.Devices(), ", "))
-	port := flags.String("port", "", "BitScope serial port (default: search)")
+	port := flags.String("port", "", "BitScope or OLS serial port (default: search)")
 	bauds := flags.String("baud", "460800,115200,230400,921600,57600,19200", "BitScope baud rates to try, in order")
 	wait := flags.Duration("wait", 300*time.Millisecond, "BitScope time to wait for a reply")
 	threshold := flags.String("threshold", "3.3", "DSLogic input threshold: 3.3 or 5 (volts)")
@@ -64,6 +65,25 @@ func run(args []string, stdout, stderr io.Writer) error {
 			return err
 		}
 		fmt.Fprintln(stdout, d)
+		return d.Close()
+	case "ols":
+		d, err := logic.Open(*device, *port, logic.Threshold3V3)
+		if err != nil {
+			return err
+		}
+		caps := d.Capabilities()
+		var inputCount int
+		var maxRate logic.Frequency
+		for r := range caps.Resources() {
+			if r.Kind.Has(logic.KindDigitalIn) {
+				inputCount++
+				maxRate = max(maxRate, r.MaxHz)
+			}
+		}
+		fmt.Fprintf(stdout, "%s\ninputs: L0-L%d (buffered)\nmaximum supported rate: %s, internal clock\n", d, inputCount-1, maxRate)
+		if samples, ok := caps.MaxSamplesFor(1); ok {
+			fmt.Fprintf(stdout, "maximum samples: %d for one enabled channel group\n", samples)
+		}
 		return d.Close()
 	case "":
 		return fmt.Errorf("-device is required: %s", strings.Join(logic.Devices(), ", "))
