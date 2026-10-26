@@ -25,8 +25,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if flags.NArg() != 0 {
 		return errors.New("unexpected arguments")
 	}
-	if *sda < 0 || *sda > 15 || *scl < 0 || *scl > 15 {
-		return errors.New("-sda and -scl are required, 0 to 15")
+	if *sda < 0 || *sda > 63 || *scl < 0 || *scl > 63 {
+		return errors.New("-sda and -scl are required, 0 to 63")
 	}
 	if *sda == *scl {
 		return errors.New("-sda and -scl must be different inputs")
@@ -36,8 +36,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		return err
 	}
 	for _, ch := range []int{*sda, *scl} {
-		if tr.Channels>>ch&1 == 0 {
-			return fmt.Errorf("L%d is not in the capture (channels %#x)", ch, tr.Channels)
+		if tr.Mask()>>ch&1 == 0 {
+			return fmt.Errorf("L%d is not in the capture (channels %#x)", ch, tr.Mask())
 		}
 	}
 	w := bufio.NewWriter(stdout)

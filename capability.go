@@ -3,6 +3,7 @@ package logic
 import (
 	"fmt"
 	"iter"
+	"math/bits"
 	"slices"
 	"strconv"
 	syncatomic "sync/atomic"
@@ -28,6 +29,18 @@ func (d *Device) Class() DeviceClass { return d.class }
 // ResourceID returns the ID of a resource on d.
 func (d *Device) ResourceID(kind ResourceKind, index uint) ResourceID {
 	return ResourceID{device: d, kind: kind, index: index}
+}
+
+// TraceInputs returns a Trace input table for the digital inputs on d that
+// mask selects. If bit n of mask is set, element n is input Ln.
+func (d *Device) TraceInputs(mask uint64) []ResourceID {
+	inputs := make([]ResourceID, bits.Len64(mask))
+	for n := range inputs {
+		if mask>>n&1 != 0 {
+			inputs[n] = d.ResourceID(KindDigitalIn, uint(n))
+		}
+	}
+	return inputs
 }
 
 // PhysicalPin returns the ID of a pin on d.

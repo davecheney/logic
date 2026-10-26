@@ -225,7 +225,7 @@ func TestOLSTrace(t *testing.T) {
 			t.Fatal(err)
 		}
 		for i, want := range []uint16{0x0201, 0x1211, 0x2221, 0x3231} {
-			if got := tr.At(i); got != want {
+			if got := tr.At(i); got != uint64(want) {
 				t.Errorf("sample %d: got %#04x, want %#04x", i, got, want)
 			}
 		}
