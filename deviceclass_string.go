@@ -12,11 +12,12 @@ func _() {
 	_ = x[ClassDSLogic-2]
 	_ = x[ClassFX2-3]
 	_ = x[ClassOLS-4]
+	_ = x[ClassLogicPirate-5]
 }
 
-const _DeviceClass_name = "bitscopedslogicfx2lafwols"
+const _DeviceClass_name = "bitscopedslogicfx2lafwolslogicpirate"
 
-var _DeviceClass_index = [...]uint8{0, 8, 15, 22, 25}
+var _DeviceClass_index = [...]uint8{0, 8, 15, 22, 25, 36}
 
 func (i DeviceClass) String() string {
 	idx := int(i) - 1

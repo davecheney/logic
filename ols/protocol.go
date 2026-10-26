@@ -153,6 +153,8 @@ func olsPlan(c capture.Config, memory int) (*olsCapture, error) {
 		}
 	}
 	switch {
+	case c.AnyEdge:
+		return nil, errors.New("ols: any-edge triggers are not supported")
 	case c.Channels == 0:
 		return nil, errors.New("ols: select at least one input")
 	case c.Rate == 0 || c.Rate > olsClock:

@@ -26,6 +26,7 @@ type traceJSON struct {
 	Channels  uint64        `json:"channels,omitempty"`
 	Trigger   *int          `json:"trigger_channel,omitempty"`
 	Falling   bool          `json:"falling"`
+	AnyEdge   bool          `json:"any_edge,omitempty"`
 	TriggerAt int           `json:"trigger_sample"`
 	Triggered bool          `json:"triggered"`
 	Width     int           `json:"sample_bytes,omitempty"`
@@ -63,7 +64,7 @@ func (t *Trace) inputNames() []string {
 
 func (t *Trace) MarshalJSON() ([]byte, error) {
 	v := traceJSON{
-		Rate: t.Rate, Falling: t.Falling, TriggerAt: t.TriggerAt,
+		Rate: t.Rate, Falling: t.Falling, AnyEdge: t.AnyEdge, TriggerAt: t.TriggerAt,
 		Triggered: t.Triggered, Width: t.Width, Samples: t.Samples,
 	}
 	numbers := t.devices()
@@ -89,7 +90,7 @@ func (t *Trace) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*t = Trace{
-		Rate: v.Rate, Falling: v.Falling, TriggerAt: v.TriggerAt,
+		Rate: v.Rate, Falling: v.Falling, AnyEdge: v.AnyEdge, TriggerAt: v.TriggerAt,
 		Triggered: v.Triggered, Width: v.Width, Samples: v.Samples,
 	}
 	if v.Inputs == nil {
@@ -146,6 +147,8 @@ func Read(r io.Reader) (*Trace, error) {
 		return nil, fmt.Errorf("logic: read capture: %w", err)
 	}
 	switch {
+	case tr.AnyEdge && tr.Falling:
+		return nil, fmt.Errorf("logic: read capture: any-edge and falling-edge triggers are mutually exclusive")
 	case tr.Width != 0 && tr.Width != 1 && tr.Width != 2 && tr.Width != 4 && tr.Width != 8:
 		return nil, fmt.Errorf("logic: read capture: sample_bytes %d is not 1, 2, 4, or 8", tr.Width)
 	case len(tr.Samples)%tr.width() != 0:
@@ -187,6 +190,11 @@ func Write(w io.Writer, format string, tr *Trace) error {
 				return err
 			}
 		}
+		if tr.AnyEdge {
+			if err := c.Write([]string{"# any_edge=true"}); err != nil {
+				return err
+			}
+		}
 		header := []string{"time_seconds"}
 		var enabled []int
 		for bit, name := range tr.inputNames() {
@@ -224,6 +232,9 @@ func writeVCD(w io.Writer, tr *Trace) error {
 	b := bufio.NewWriter(w)
 	fmt.Fprintf(b, "$comment sample_rate_hz=%s trigger_sample=%d triggered=%t $end\n",
 		strconv.FormatFloat(tr.Rate.Hz(), 'g', -1, 64), tr.TriggerAt, tr.Triggered)
+	if tr.AnyEdge {
+		fmt.Fprintln(b, "$comment any_edge=true $end")
+	}
 	fmt.Fprintln(b, "$timescale 1 ps $end")
 	fmt.Fprintln(b, "$scope module logic $end")
 	var enabled []int

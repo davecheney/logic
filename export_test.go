@@ -17,6 +17,7 @@ func TestReadWrite(t *testing.T) {
 		{Rate: 2500 * MilliHertz, Inputs: NewDevice(ClassBitScope).TraceInputs(1), Samples: []byte{0, 1}},
 		{Rate: MilliHertz, Inputs: NewDevice(ClassBitScope).TraceInputs(1), Samples: []byte{0, 1}},
 		{Rate: ^Frequency(0), Inputs: NewDevice(ClassBitScope).TraceInputs(1), Samples: []byte{0, 1}},
+		{Rate: MegaHertz, Inputs: NewDevice(ClassLogicPirate).TraceInputs(0x81), AnyEdge: true, Triggered: true, Samples: []byte{0, 0x80}},
 	} {
 		var buf bytes.Buffer
 		if err := Write(&buf, "json", tr); err != nil {
@@ -27,7 +28,7 @@ func TestReadWrite(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got.Rate != tr.Rate || got.Mask() != tr.Mask() || got.TriggerAt != tr.TriggerAt ||
-			got.Triggered != tr.Triggered || got.Width != tr.Width || !bytes.Equal(got.Samples, tr.Samples) {
+			got.Triggered != tr.Triggered || got.AnyEdge != tr.AnyEdge || got.Width != tr.Width || !bytes.Equal(got.Samples, tr.Samples) {
 			t.Fatalf("got %+v, want %+v", got, tr)
 		}
 	}
@@ -78,9 +79,39 @@ func TestReadInvalid(t *testing.T) {
 		`{"sample_rate":"1Hz","inputs":[{"device":1,"class":"saleae","index":0}],"samples":"AA=="}`,
 		`{"sample_rate":"1Hz","inputs":[{"device":1,"index":0},{"device":1,"index":0}],"samples":"AA=="}`,
 		`{"sample_rate":"1Hz","inputs":[{"device":1,"class":"fx2lafw","index":0},{"device":1,"class":"dslogic","index":1}],"samples":"AA=="}`,
+		`{"sample_rate":"1MHz","any_edge":true,"falling":true,"samples":"AAE="}`,
 	} {
 		if _, err := Read(strings.NewReader(s)); err == nil {
 			t.Errorf("%q: accepted", s)
+		}
+	}
+}
+
+func TestAnyEdgeExport(t *testing.T) {
+	dev := NewDevice(ClassLogicPirate)
+	tr := &Trace{
+		Rate: MegaHertz, Inputs: dev.TraceInputs(0x81), Trigger: dev.ResourceID(KindDigitalIn, 7),
+		AnyEdge: true, Triggered: true, TriggerAt: 1, Samples: []byte{0, 0x80},
+	}
+	for _, format := range []string{"json", "csv", "vcd"} {
+		var buf bytes.Buffer
+		if err := Write(&buf, format, tr); err != nil {
+			t.Fatal(err)
+		}
+		marker := "any_edge=true"
+		if format == "json" {
+			marker = `"any_edge":true`
+			got, err := Read(bytes.NewReader(buf.Bytes()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !got.AnyEdge || got.Falling || got.Trigger.Index() != 7 ||
+				got.Trigger.Device().Class() != ClassLogicPirate {
+				t.Fatalf("round trip lost trigger or class: %+v", got)
+			}
+		}
+		if strings.Count(buf.String(), marker) != 1 {
+			t.Fatalf("%s: expected one any-edge marker: %s", format, &buf)
 		}
 	}
 }

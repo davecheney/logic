@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/davecheney/logic"
+	"github.com/davecheney/logic/internal/sump"
 )
 
 type fakeOLSPort struct {
@@ -197,24 +198,24 @@ func TestOLSCancelResetsDevice(t *testing.T) {
 func TestOLSReadAndWriteFull(t *testing.T) {
 	p := &fakeOLSPort{read: []byte{1, 2, 3}, readLimit: 1, writeLimit: 1}
 	var got [3]byte
-	if err := readOLSFull(context.Background(), p, got[:]); err != nil {
+	if err := sump.ReadFull(context.Background(), p, got[:]); err != nil {
 		t.Fatal(err)
 	}
 	if got != [3]byte{1, 2, 3} {
 		t.Fatalf("read: %v", got)
 	}
 	var out shortWriter
-	if err := writeOLSFull(&out, []byte{4, 5, 6}); err != nil || !bytes.Equal(out.b, []byte{4, 5, 6}) {
+	if err := sump.WriteFull(&out, []byte{4, 5, 6}); err != nil || !bytes.Equal(out.b, []byte{4, 5, 6}) {
 		t.Fatalf("write: %v %v", out.b, err)
 	}
-	if err := readOLSFull(context.Background(), emptyOLSPort{}, make([]byte, 1)); !errors.Is(err, io.EOF) {
+	if err := sump.ReadFull(context.Background(), emptyOLSPort{}, make([]byte, 1)); !errors.Is(err, io.EOF) {
 		t.Fatalf("read error: %v, want EOF", err)
 	}
 }
 
 func TestOLSReadExpiredDeadline(t *testing.T) {
 	ctx := olsDeadlineContext{Context: context.Background(), deadline: time.Now().Add(-time.Second)}
-	err := readOLSFull(ctx, emptyOLSPort{}, make([]byte, 1))
+	err := sump.ReadFull(ctx, emptyOLSPort{}, make([]byte, 1))
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("read error: %v, want deadline exceeded", err)
 	}

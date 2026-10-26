@@ -5,7 +5,7 @@
 // prints the replies. The BS05 uses an FT245R. This chip is a USB to
 // parallel FIFO, not a UART, so the device ignores the baud rate.
 //
-// For an OLS it prints the device identity and supported capture limits.
+// For an OLS or Logic Pirate it prints the identity and capture limits.
 // For a DSLogic it loads the firmware and prints the FPGA status and HDL
 // version.
 package main
@@ -27,6 +27,7 @@ import (
 	"github.com/davecheney/logic/bitscope"
 	"github.com/davecheney/logic/dslogic"
 	"github.com/davecheney/logic/fx2lafw"
+	"github.com/davecheney/logic/logicpirate"
 	"github.com/davecheney/logic/ols"
 )
 
@@ -34,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("logic-probe", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	device := flags.String("device", "", "analyser, required: "+strings.Join(analyzer.Devices(), ", "))
-	port := flags.String("port", "", "BitScope or OLS serial port (default: search)")
+	port := flags.String("port", "", "BitScope, OLS, or Logic Pirate serial port (default: search)")
 	bauds := flags.String("baud", "460800,115200,230400,921600,57600,19200", "BitScope baud rates to try, in order")
 	wait := flags.Duration("wait", 300*time.Millisecond, "BitScope time to wait for a reply")
 	threshold := flags.String("threshold", "3.3", "DSLogic input threshold: 3.3 or 5 (volts)")
@@ -88,6 +89,20 @@ func run(args []string, stdout, stderr io.Writer) error {
 		fmt.Fprintf(stdout, "%s\ninputs: L0-L%d (buffered)\nmaximum supported rate: %s, internal clock\n", d, inputCount-1, maxRate)
 		if samples, ok := caps.MaxSamplesFor(1); ok {
 			fmt.Fprintf(stdout, "maximum samples: %d for one enabled channel group\n", samples)
+		}
+		return d.Close()
+	case "logicpirate":
+		d, err := logicpirate.Open(*port)
+		if err != nil {
+			return err
+		}
+		caps := d.Capabilities()
+		for r := range caps.Resources() {
+			fmt.Fprintf(stdout, "%s\ninputs: L0-L7\nsample rates: %v\ntrigger: either edge\n", d, r.Rates)
+			break
+		}
+		if samples, ok := caps.MaxSamplesFor(8); ok {
+			fmt.Fprintf(stdout, "maximum samples: %d\n", samples)
 		}
 		return d.Close()
 	case "":

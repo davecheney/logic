@@ -9,6 +9,7 @@ import (
 	"github.com/davecheney/logic/bitscope"
 	"github.com/davecheney/logic/dslogic"
 	"github.com/davecheney/logic/fx2lafw"
+	"github.com/davecheney/logic/logicpirate"
 	"github.com/davecheney/logic/ols"
 )
 
@@ -68,6 +69,13 @@ var drivers = []driver{
 		capabilities: ols.Capabilities,
 		validate:     ols.Validate,
 	},
+	{
+		name:         "logicpirate",
+		class:        logic.ClassLogicPirate,
+		open:         func(port string, _ dslogic.Threshold) (logic.Analyzer, error) { return logicpirate.Open(port) },
+		capabilities: logicpirate.Capabilities,
+		validate:     logicpirate.Validate,
+	},
 }
 
 // Devices returns the names that Open accepts.
@@ -91,8 +99,8 @@ func lookup(name string) (driver, error) {
 	return driver{}, fmt.Errorf("logic: unknown device %q: use %s", name, strings.Join(Devices(), ", "))
 }
 
-// Open opens the named analyser. port selects a BitScope or OLS serial port,
-// or searches for one when empty. th selects the DSLogic input threshold.
+// Open opens the named analyser. port selects a BitScope, OLS, or Logic
+// Pirate serial port, or searches when empty. th selects the DSLogic threshold.
 func Open(name, port string, th dslogic.Threshold) (logic.Analyzer, error) {
 	d, err := lookup(name)
 	if err != nil {

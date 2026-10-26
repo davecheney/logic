@@ -16,6 +16,7 @@ type Config struct {
 	Samples    int
 	Source     int // trigger input
 	Falling    bool
+	AnyEdge    bool
 	PreTrigger float64       // fraction of samples before the trigger
 	Auto       time.Duration // zero waits for a trigger; otherwise permits an auto trace
 }
@@ -23,6 +24,9 @@ type Config struct {
 // FromRequest checks req against the resources of dev and returns its
 // driver settings.
 func FromRequest(dev *logic.Device, caps logic.CapabilitySet, req logic.CaptureRequest) (Config, error) {
+	if req.AnyEdge && req.Falling {
+		return Config{}, fmt.Errorf("logic: any-edge and falling-edge triggers are mutually exclusive")
+	}
 	if len(req.Inputs) == 0 {
 		return Config{}, fmt.Errorf("logic: capture needs at least one input")
 	}
@@ -57,7 +61,7 @@ func FromRequest(dev *logic.Device, caps logic.CapabilitySet, req logic.CaptureR
 
 	return Config{
 		Channels: channels, Rate: req.Rate, Samples: req.Samples,
-		Source: int(req.Trigger.Index()), Falling: req.Falling,
+		Source: int(req.Trigger.Index()), Falling: req.Falling, AnyEdge: req.AnyEdge,
 		PreTrigger: req.PreTrigger, Auto: req.Auto,
 	}, nil
 }

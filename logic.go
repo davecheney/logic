@@ -1,6 +1,6 @@
 // Package logic drives logic analysers from the command line. It supports
 // the BitScope BS05, the original DreamSourceLab DSLogic, the Open Logic
-// Sniffer, and eight-channel 24 MHz Saleae Logic clones.
+// Sniffer, the Logic Pirate, and eight-channel 24 MHz Saleae Logic clones.
 package logic
 
 import (
@@ -11,13 +11,15 @@ import (
 	"time"
 )
 
-// CaptureRequest selects digital resources for one capture.
+// CaptureRequest selects digital resources for one capture. The trigger is
+// rising by default, falling with Falling, or either edge with AnyEdge.
 type CaptureRequest struct {
 	Inputs     []ResourceID
 	Trigger    ResourceID
 	Rate       Frequency
 	Samples    int
 	Falling    bool
+	AnyEdge    bool // either edge; mutually exclusive with Falling
 	PreTrigger float64
 	Auto       time.Duration
 }
@@ -52,6 +54,7 @@ type Trace struct {
 	Inputs    []ResourceID
 	Trigger   ResourceID
 	Falling   bool
+	AnyEdge   bool
 	TriggerAt int
 	Triggered bool
 	Width     int

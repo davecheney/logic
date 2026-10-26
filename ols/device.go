@@ -4,35 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/davecheney/logic"
 	"github.com/davecheney/logic/internal/capture"
+	"github.com/davecheney/logic/internal/sump"
 	"go.bug.st/serial"
 	"go.bug.st/serial/enumerator"
 )
 
 const (
-	olsVendorID    = "04d8"
-	olsProductID   = "fc92"
-	olsReadTimeout = 50 * time.Millisecond
+	olsVendorID  = "04d8"
+	olsProductID = "fc92"
 )
-
-type olsSerial interface {
-	io.ReadWriteCloser
-	SetReadTimeout(time.Duration) error
-	ResetInputBuffer() error
-	Drain() error
-}
 
 // OLS drives an Open Workbench Logic Sniffer on its USB CDC serial port.
 // Use only L0 through L15, the buffered inputs.
 type OLS struct {
 	ID     string
-	port   olsSerial
+	port   sump.Port
 	device *logic.Device
 	meta   olsMetadata
 	mu     sync.Mutex
@@ -81,7 +73,7 @@ func Open(port string) (_ *OLS, err error) {
 			err = errors.Join(err, p.Close())
 		}
 	}()
-	if err := p.SetReadTimeout(olsReadTimeout); err != nil {
+	if err := p.SetReadTimeout(sump.ReadTimeout); err != nil {
 		return nil, fmt.Errorf("ols: set read timeout: %w", err)
 	}
 	if err := p.ResetInputBuffer(); err != nil {
@@ -97,25 +89,25 @@ func Open(port string) (_ *OLS, err error) {
 	return d, nil
 }
 
-func identifyOLS(ctx context.Context, p olsSerial) (olsMetadata, error) {
+func identifyOLS(ctx context.Context, p sump.Port) (olsMetadata, error) {
 	var m olsMetadata
-	if err := writeOLSCommand(p, []byte{0, 0, 0, 0, 0}); err != nil {
+	if err := sump.WriteCommand(p, []byte{0, 0, 0, 0, 0}); err != nil {
 		return m, fmt.Errorf("ols: reset: %w", err)
 	}
-	if err := writeOLSCommand(p, []byte{olsCmdID}); err != nil {
+	if err := sump.WriteCommand(p, []byte{olsCmdID}); err != nil {
 		return m, fmt.Errorf("ols: request ID: %w", err)
 	}
 	id := make([]byte, len(olsID))
-	if err := readOLSFull(ctx, p, id); err != nil {
+	if err := sump.ReadFull(ctx, p, id); err != nil {
 		return m, fmt.Errorf("ols: read ID: %w", err)
 	}
 	if string(id) != string(olsID) {
 		return m, fmt.Errorf("ols: invalid ID %q", id)
 	}
-	if err := writeOLSCommand(p, []byte{olsCmdMetadata}); err != nil {
+	if err := sump.WriteCommand(p, []byte{olsCmdMetadata}); err != nil {
 		return m, fmt.Errorf("ols: request metadata: %w", err)
 	}
-	reply, err := readOLSTokenReply(ctx, p)
+	reply, err := sump.ReadTokenReply(ctx, p)
 	if err != nil {
 		return m, fmt.Errorf("ols: read metadata: %w", err)
 	}
@@ -132,21 +124,14 @@ func identifyOLS(ctx context.Context, p olsSerial) (olsMetadata, error) {
 }
 
 func (d *OLS) reset() error {
-	if err := writeOLSFull(d.port, []byte{olsCmdReset, olsCmdReset, olsCmdReset, olsCmdReset, olsCmdReset}); err != nil {
+	if err := sump.WriteFull(d.port, []byte{olsCmdReset, olsCmdReset, olsCmdReset, olsCmdReset, olsCmdReset}); err != nil {
 		return fmt.Errorf("ols: reset: %w", err)
 	}
 	return d.port.Drain()
 }
 
 func (d *OLS) writeCommand(b []byte) error {
-	return writeOLSCommand(d.port, b)
-}
-
-func writeOLSCommand(p olsSerial, b []byte) error {
-	if err := writeOLSFull(p, b); err != nil {
-		return err
-	}
-	return p.Drain()
+	return sump.WriteCommand(d.port, b)
 }
 
 // String returns the device name.
@@ -253,13 +238,13 @@ func (d *OLS) captureLogic(ctx context.Context, c capture.Config) (*logic.Trace,
 		captureTime := time.Duration(float64(p.readCount) / p.rate.Hz() * float64(time.Second))
 		deadline := time.Now().Add(c.Auto).Add(captureTime)
 		var first [1]byte
-		hasData, err := readOLSByteUntil(ctx, d.port, deadline, first[:])
+		hasData, err := sump.ReadByteUntil(ctx, d.port, deadline, first[:])
 		if err != nil {
 			return nil, d.abort(fmt.Errorf("ols: wait for trigger: %w", err))
 		}
 		if hasData {
 			raw[0] = first[0]
-			if err := readOLSFull(ctx, d.port, raw[1:]); err != nil {
+			if err := sump.ReadFull(ctx, d.port, raw[1:]); err != nil {
 				return nil, d.abort(fmt.Errorf("ols: read capture: %w", err))
 			}
 		} else {
@@ -268,13 +253,13 @@ func (d *OLS) captureLogic(ctx context.Context, c capture.Config) (*logic.Trace,
 			}
 			triggered = false
 			finishCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-			err := readOLSFull(finishCtx, d.port, raw)
+			err := sump.ReadFull(finishCtx, d.port, raw)
 			cancel()
 			if err != nil {
 				return nil, d.abort(fmt.Errorf("ols: read auto capture: %w", err))
 			}
 		}
-	} else if err := readOLSFull(ctx, d.port, raw); err != nil {
+	} else if err := sump.ReadFull(ctx, d.port, raw); err != nil {
 		return nil, d.abort(fmt.Errorf("ols: read capture: %w", err))
 	}
 	tr, err := p.trace(c, raw, triggered)
@@ -292,145 +277,5 @@ func (d *OLS) abort(cause error) error {
 	return errors.Join(cause, resetErr, bufferErr)
 }
 
-func waitOLS(ctx context.Context, delay time.Duration) error {
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
-}
-
-func readOLSFull(ctx context.Context, r olsSerial, b []byte) error {
-	for len(b) > 0 {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		timeout := olsReadTimeout
-		if deadline, ok := ctx.Deadline(); ok {
-			remaining := time.Until(deadline)
-			if remaining <= 0 {
-				return context.DeadlineExceeded
-			}
-			timeout = min(timeout, remaining)
-		}
-		if err := r.SetReadTimeout(timeout); err != nil {
-			return fmt.Errorf("set read timeout: %w", err)
-		}
-		n, err := r.Read(b)
-		b = b[n:]
-		if len(b) == 0 {
-			return nil
-		}
-		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			return err
-		}
-		if n == 0 {
-			if err := waitOLS(ctx, time.Millisecond); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func readOLSByteUntil(ctx context.Context, r olsSerial, deadline time.Time, b []byte) (bool, error) {
-	for {
-		if err := ctx.Err(); err != nil {
-			return false, err
-		}
-		remaining := time.Until(deadline)
-		if remaining <= 0 {
-			return false, nil
-		}
-		if err := r.SetReadTimeout(min(olsReadTimeout, remaining)); err != nil {
-			return false, fmt.Errorf("set read timeout: %w", err)
-		}
-		n, err := r.Read(b)
-		if n > 0 {
-			return true, nil
-		}
-		if err != nil {
-			if ctx.Err() != nil {
-				return false, ctx.Err()
-			}
-			if time.Until(deadline) <= 0 {
-				return false, nil
-			}
-			return false, err
-		}
-		if err := waitOLS(ctx, time.Millisecond); err != nil {
-			return false, err
-		}
-	}
-}
-
-func readOLSTokenReply(ctx context.Context, r olsSerial) ([]byte, error) {
-	var reply []byte
-	var one [1]byte
-	for len(reply) < 512 {
-		if err := readOLSFull(ctx, r, one[:]); err != nil {
-			return nil, err
-		}
-		key := one[0]
-		reply = append(reply, key)
-		if key == 0 {
-			return reply, nil
-		}
-		var n int
-		switch key >> 5 {
-		case 0:
-			for {
-				if err := readOLSFull(ctx, r, one[:]); err != nil {
-					return nil, err
-				}
-				reply = append(reply, one[0])
-				if one[0] == 0 {
-					break
-				}
-				if len(reply) >= 512 {
-					return nil, errors.New("token reply exceeds 512 bytes")
-				}
-			}
-		case 1:
-			n = 4
-		case 2:
-			n = 1
-		default:
-			return nil, fmt.Errorf("token reply has unknown key type %#02x", key)
-		}
-		if n != 0 {
-			if len(reply)+n > 512 {
-				return nil, errors.New("token reply exceeds 512 bytes")
-			}
-			data := make([]byte, n)
-			if err := readOLSFull(ctx, r, data); err != nil {
-				return nil, err
-			}
-			reply = append(reply, data...)
-		}
-	}
-	return nil, errors.New("token reply exceeds 512 bytes")
-}
-
-func writeOLSFull(w io.Writer, b []byte) error {
-	for len(b) > 0 {
-		n, err := w.Write(b)
-		b = b[n:]
-		if err != nil {
-			return err
-		}
-		if n == 0 {
-			return io.ErrShortWrite
-		}
-	}
-	return nil
-}
-
 // Ensure serial implementations and tests satisfy the transport contract.
-var _ olsSerial = (serial.Port)(nil)
+var _ sump.Port = (serial.Port)(nil)

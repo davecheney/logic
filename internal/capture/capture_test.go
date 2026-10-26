@@ -73,6 +73,7 @@ func TestFromRequestRejectsInvalidResources(t *testing.T) {
 		{"duplicate input", func(r *logic.CaptureRequest) { r.Inputs = []logic.ResourceID{input0, input0} }},
 		{"trigger not selected", func(r *logic.CaptureRequest) { r.Trigger = rs[2].ID }},
 		{"invalid trigger", func(r *logic.CaptureRequest) { r.Trigger = analog }},
+		{"conflicting edges", func(r *logic.CaptureRequest) { r.AnyEdge, r.Falling = true, true }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
