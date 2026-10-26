@@ -20,7 +20,6 @@ const (
 	reqCtlWr    = 0xb0
 	reqCtlRdPre = 0xb1
 	reqCtlRd    = 0xb2
-	reqFX2Load  = 0xa0
 
 	vendorOut = gousb.ControlVendor | gousb.ControlDevice | gousb.ControlOut
 	vendorIn  = gousb.ControlVendor | gousb.ControlDevice | gousb.ControlIn
@@ -107,10 +106,10 @@ func find(ctx *gousb.Context) (*gousb.Device, error) {
 		return dev, nil
 	}
 	log.Printf("dslogic: loading FX2 firmware")
-	err = loadFirmware(dev)
+	err = loadFirmware(dev, dslogicFirmware)
 	dev.Close()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dslogic: %w", err)
 	}
 	deadline := time.Now().Add(10 * time.Second)
 	time.Sleep(500 * time.Millisecond)
@@ -135,27 +134,6 @@ func loaded(dev *gousb.Device) bool {
 	}
 	p, err := dev.Product()
 	return err == nil && p == loadedProduct
-}
-
-func loadFirmware(dev *gousb.Device) error {
-	dev.ControlTimeout = 3 * time.Second
-	reset := func(on byte) error {
-		_, err := dev.Control(vendorOut, reqFX2Load, 0xe600, 0, []byte{on})
-		return err
-	}
-	if err := reset(1); err != nil {
-		return fmt.Errorf("dslogic: FX2 reset: %w", err)
-	}
-	for off := 0; off < len(fx2Firmware); off += 4096 {
-		chunk := fx2Firmware[off:min(off+4096, len(fx2Firmware))]
-		if _, err := dev.Control(vendorOut, reqFX2Load, uint16(off), 0, chunk); err != nil {
-			return fmt.Errorf("dslogic: firmware write at %#x: %w", off, err)
-		}
-	}
-	if err := reset(0); err != nil {
-		return fmt.Errorf("dslogic: FX2 run: %w", err)
-	}
-	return nil
 }
 
 func (d *DSLogic) claim() error {

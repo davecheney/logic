@@ -10,6 +10,7 @@ Supported analysers:
 |---|---|---|---|
 | BitScope Micro (BS05) | `bitscope` | L0 to L5 | [docs/bitscope.md](docs/bitscope.md) |
 | DreamSourceLab DSLogic (original) | `dslogic` | L0 to L15 | [docs/dslogic.md](docs/dslogic.md) |
+| Generic Saleae Logic clone (8 channels, 24 MHz) | `fx2lafw` or `saleae` | L0 to L7 | [docs/fx2lafw.md](docs/fx2lafw.md) |
 
 | Command | Use |
 |---|---|
@@ -29,8 +30,9 @@ JSON file.
 go install github.com/davecheney/logic/cmd/...@latest
 ```
 
-The DSLogic needs libusb (`brew install libusb` on macOS). On Linux, see
-[docs/linux.md](docs/linux.md) for the udev rule and serial port group.
+The DSLogic and the Saleae Logic clone need libusb (`brew install libusb`
+on macOS). On Linux, see [docs/linux.md](docs/linux.md) for the udev rules
+and serial port group.
 
 ## Example
 

@@ -1,5 +1,6 @@
 // Package logic drives logic analysers from the command line. It supports
-// the BitScope BS05 and the original DreamSourceLab DSLogic.
+// the BitScope BS05, the original DreamSourceLab DSLogic, and eight-channel
+// 24 MHz Saleae Logic clones.
 package logic
 
 import (

@@ -39,3 +39,25 @@ with them.
 The dslogic package follows the USB protocol of the DSView libsigrok4DSL
 driver (libsigrok4DSL/hardware/DSL). Copyright (C) 2013 DreamSourceLab
 and the sigrok project.
+
+----
+
+fx2lafw_firmware/fx2lafw-saleae-logic.fw is the sigrok fx2lafw firmware
+for the Cypress FX2 in eight-channel Saleae Logic clones. It is copied
+without change from the sigrok-firmware-fx2lafw 0.1.7 binary release
+(https://sigrok.org/download/binary/sigrok-firmware-fx2lafw/
+sigrok-firmware-fx2lafw-bin-0.1.7.tar.gz, sha256
+c876fd075549e7783a6d5bfc8d99a695cfc583ddbcea0217d8e3f9351d1723af).
+
+  fx2lafw-saleae-logic.fw sha256 dbb9fc37e9cceaa1034f6f68d99d752e0570f449b3a6c1b7dec45df28e614863
+
+Copyright (C) the sigrok project and contributors.
+
+The firmware is licensed under the GNU General Public License, version 2
+or later. Its source is at https://sigrok.org/wiki/Fx2lafw and
+https://github.com/sigrokproject/sigrok-firmware-fx2lafw. The firmware
+runs on the analyser, not on the host. The logic package sends it to the
+device and does not link with it.
+
+The fx2lafw driver follows the USB protocol of the libsigrok fx2lafw
+driver (src/hardware/fx2lafw). Copyright (C) the sigrok project.
