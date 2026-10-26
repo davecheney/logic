@@ -314,7 +314,7 @@ func (d *DSLogic) CaptureLogic(ctx context.Context, c Config) (*Trace, error) {
 		samples = samples[:2*p.limit]
 	}
 	tr := &Trace{
-		Rate: p.rate, Channels: c.Channels, Source: c.Source, Falling: c.Falling,
+		Rate: frequencyFromHz(p.rate), Channels: c.Channels, Source: c.Source, Falling: c.Falling,
 		Triggered: !auto && h.Status&1 != 0, Width: 2, Samples: samples,
 	}
 	if tr.Triggered {

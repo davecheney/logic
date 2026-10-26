@@ -56,7 +56,7 @@ func decode(tr *logic.Trace, sda, scl int) []string {
 	var bits, n int
 	addr := false
 	flush := func() {
-		lines = append(lines, fmt.Sprintf("%+.9f %s", float64(start-tr.TriggerAt)/tr.Rate, strings.Join(tx, " ")))
+		lines = append(lines, fmt.Sprintf("%+.9f %s", float64(start-tr.TriggerAt)/tr.Rate.Hz(), strings.Join(tx, " ")))
 		tx = nil
 	}
 	prev := tr.At(0)

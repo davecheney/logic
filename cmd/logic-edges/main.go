@@ -67,7 +67,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		}
 	}
 	fmt.Fprintf(w, "# sample_rate_hz=%g trigger_sample=%d triggered=%t start=%+.9f %s\n",
-		tr.Rate, tr.TriggerAt, tr.Triggered, seconds(lo, tr), strings.Join(levels, " "))
+		tr.Rate.Hz(), tr.TriggerAt, tr.Triggered, seconds(lo, tr), strings.Join(levels, " "))
 	n := 0
 	prev := tr.At(lo)
 	for i := lo + 1; i < hi; i++ {
@@ -90,11 +90,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 
 // seconds returns the time of sample i relative to the trigger.
 func seconds(i int, tr *logic.Trace) float64 {
-	return float64(i-tr.TriggerAt) / tr.Rate
+	return float64(i-tr.TriggerAt) / tr.Rate.Hz()
 }
 
-func samples(d time.Duration, rate float64) int {
-	return int(d.Seconds() * rate)
+func samples(d time.Duration, rate logic.Frequency) int {
+	return int(d.Seconds() * rate.Hz())
 }
 
 func clamp(v, lo, hi int) int {

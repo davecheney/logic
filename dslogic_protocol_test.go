@@ -37,52 +37,53 @@ func TestSettingLayout(t *testing.T) {
 
 func TestPlan(t *testing.T) {
 	for _, tc := range []struct {
-		name     string
-		cfg      Config
-		rate     float64
-		mode     uint16
-		div      uint32
-		cnt      uint32
-		tpos     uint32
-		mask0    uint16
-		value0   uint16
-		edge0    uint16
-		enabled  int
-		trigGlb  uint16
-		actual   int
-		dsoCount uint32
+		name      string
+		cfg       Config
+		rate      float64
+		traceRate Frequency
+		mode      uint16
+		div       uint32
+		cnt       uint32
+		tpos      uint32
+		mask0     uint16
+		value0    uint16
+		edge0     uint16
+		enabled   int
+		trigGlb   uint16
+		actual    int
+		dsoCount  uint32
 	}{{
 		name: "1 MHz, 16 inputs, rising L0",
 		cfg:  Config{Channels: 0xffff, Rate: 1 * MegaHertz, Samples: 4096, PreTrigger: 0.05},
-		rate: 1e6, mode: modeTrigEn, div: 100,
+		rate: 1e6, traceRate: MegaHertz, mode: modeTrigEn, div: 100,
 		cnt: 4096 >> 4, tpos: 192,
 		mask0: 0xfffe, value0: 1, edge0: 1,
 		enabled: 16, trigGlb: 16 << 8, actual: 4096, dsoCount: 4096,
 	}, {
 		name: "rounds the rate down and the count up",
 		cfg:  Config{Channels: 0x0003, Rate: 3 * MegaHertz, Samples: 1000, Source: 1, Falling: true},
-		rate: 100e6 / 34, mode: modeTrigEn | modeSlow, div: 34,
+		rate: 100e6 / 34, traceRate: 2_941_176_471 * MilliHertz, mode: modeTrigEn | modeSlow, div: 34,
 		cnt: 1024 >> 4, tpos: 64,
 		mask0: 0xfffd, value0: 0, edge0: 2,
 		enabled: 2, trigGlb: 2 << 8, actual: 1024, dsoCount: 1024,
 	}, {
 		name: "100 MHz",
 		cfg:  Config{Channels: 0x00ff, Rate: 100 * MegaHertz, Samples: 1 << 20, PreTrigger: 0.5},
-		rate: 100e6, mode: modeTrigEn, div: 1,
+		rate: 100e6, traceRate: 100 * MegaHertz, mode: modeTrigEn, div: 1,
 		cnt: 1 << 16, tpos: 1 << 19,
 		mask0: 0xfffe, value0: 1, edge0: 1,
 		enabled: 8, trigGlb: 8 << 8, actual: 1 << 20, dsoCount: 1 << 20,
 	}, {
 		name: "200 MHz copies the trigger to both bytes",
 		cfg:  Config{Channels: 0x0081, Rate: 200 * MegaHertz, Samples: 4096, Source: 7},
-		rate: 200e6, mode: modeTrigEn | modeHalf, div: 1,
+		rate: 200e6, traceRate: 200 * MegaHertz, mode: modeTrigEn | modeHalf, div: 1,
 		cnt: 4096 >> 4, tpos: 64,
 		mask0: 0x7f7f, value0: 0x8080, edge0: 0x8080,
 		enabled: 2, trigGlb: 2 << 8, actual: 4096, dsoCount: 4096,
 	}, {
 		name: "400 MHz copies the trigger to all nibbles",
 		cfg:  Config{Channels: 0x000f, Rate: 400 * MegaHertz, Samples: 4096, Source: 2},
-		rate: 400e6, mode: modeTrigEn | modeQuar, div: 1,
+		rate: 400e6, traceRate: 400 * MegaHertz, mode: modeTrigEn | modeQuar, div: 1,
 		cnt: 4096 >> 4, tpos: 64,
 		mask0: 0xbbbb, value0: 0x4444, edge0: 0x4444,
 		enabled: 4, trigGlb: 4 << 8, actual: 4096, dsoCount: 4096,
@@ -101,6 +102,9 @@ func TestPlan(t *testing.T) {
 			}
 			if p.rate != tc.rate {
 				t.Errorf("rate: got %g, want %g", p.rate, tc.rate)
+			}
+			if got := frequencyFromHz(p.rate); got != tc.traceRate {
+				t.Errorf("trace rate: got %v, want %v", got, tc.traceRate)
 			}
 			check("mode", uint32(s.Mode), uint32(tc.mode))
 			check("div", uint32(s.DivH)<<16|uint32(s.DivL), tc.div)

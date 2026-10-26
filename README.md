@@ -50,6 +50,16 @@ Package `logic` holds the drivers and the capture types. `Open` opens an
 analyser by name, `Validate` checks a `Config` without opening one, and
 `Write` writes a `Trace` as JSON, CSV, or VCD. `Read` reads the JSON back.
 
+`Config.Rate` and `Trace.Rate` use `Frequency`, stored in milliHertz.
+For example, use `4 * logic.MegaHertz` for 4 MHz, or `rate.Hz()` when a
+calculation needs Hertz as a `float64`. Actual digital trace rates are
+rounded to the nearest milliHertz.
+
+Trace JSON uses a `sample_rate` string, such as `"4MHz"`. `Frequency`
+implements JSON encoding and decoding with the same unit notation as
+`String` and `ParseFrequency`. Old captures with a numeric
+`sample_rate_hz` field are not supported.
+
 ## Tests
 
 ```sh

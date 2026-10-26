@@ -21,8 +21,8 @@ func Read(r io.Reader) (*Trace, error) {
 		return nil, fmt.Errorf("logic: read capture: sample_bytes %d is not 1 or 2", tr.Width)
 	case tr.Width == 2 && len(tr.Samples)%2 != 0:
 		return nil, fmt.Errorf("logic: read capture: odd byte count with sample_bytes 2")
-	case !(tr.Rate > 0) || math.IsInf(tr.Rate, 0):
-		return nil, fmt.Errorf("logic: read capture: invalid sample_rate_hz")
+	case tr.Rate == 0:
+		return nil, fmt.Errorf("logic: read capture: invalid sample_rate")
 	case tr.Len() == 0:
 		return nil, fmt.Errorf("logic: read capture: no samples")
 	}
@@ -41,7 +41,7 @@ func Write(w io.Writer, format string, tr *Trace) error {
 	case "csv":
 		c := csv.NewWriter(w)
 		for _, metadata := range []string{
-			fmt.Sprintf("# sample_rate_hz=%s", strconv.FormatFloat(tr.Rate, 'g', -1, 64)),
+			fmt.Sprintf("# sample_rate_hz=%s", strconv.FormatFloat(tr.Rate.Hz(), 'g', -1, 64)),
 			fmt.Sprintf("# channels=%d", tr.Channels),
 			fmt.Sprintf("# trigger_channel=%d", tr.Source),
 			fmt.Sprintf("# falling=%t", tr.Falling),
@@ -64,7 +64,7 @@ func Write(w io.Writer, format string, tr *Trace) error {
 		row := make([]string, len(header))
 		for i := range tr.Len() {
 			sample := tr.At(i)
-			row[0] = strconv.FormatFloat(float64(i)/tr.Rate, 'g', -1, 64)
+			row[0] = strconv.FormatFloat(float64(i)/tr.Rate.Hz(), 'g', -1, 64)
 			col := 1
 			for ch := range 16 {
 				if tr.Channels&(1<<ch) != 0 {
@@ -90,7 +90,7 @@ func Write(w io.Writer, format string, tr *Trace) error {
 func writeVCD(w io.Writer, tr *Trace) error {
 	b := bufio.NewWriter(w)
 	fmt.Fprintf(b, "$comment sample_rate_hz=%s trigger_sample=%d triggered=%t $end\n",
-		strconv.FormatFloat(tr.Rate, 'g', -1, 64), tr.TriggerAt, tr.Triggered)
+		strconv.FormatFloat(tr.Rate.Hz(), 'g', -1, 64), tr.TriggerAt, tr.Triggered)
 	fmt.Fprintln(b, "$timescale 1 ps $end")
 	fmt.Fprintln(b, "$scope module logic $end")
 	var enabled []int
@@ -102,7 +102,7 @@ func writeVCD(w io.Writer, tr *Trace) error {
 	}
 	fmt.Fprintln(b, "$upscope $end")
 	fmt.Fprintln(b, "$enddefinitions $end")
-	ps := func(i int) int64 { return int64(math.Round(float64(i) * 1e12 / tr.Rate)) }
+	ps := func(i int) int64 { return int64(math.Round(float64(i) * 1e12 / tr.Rate.Hz())) }
 	prev := tr.At(0)
 	fmt.Fprintln(b, "#0")
 	fmt.Fprintln(b, "$dumpvars")

@@ -63,8 +63,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if tr.Channels>>c.line&1 == 0 {
 		return fmt.Errorf("L%d is not in the capture (channels %#x)", c.line, tr.Channels)
 	}
-	if tr.Rate/c.baud < 4 {
-		return fmt.Errorf("%g S/s is too slow for %g baud, capture at least 4 samples a bit", tr.Rate, c.baud)
+	if tr.Rate.Hz()/c.baud < 4 {
+		return fmt.Errorf("%g S/s is too slow for %g baud, capture at least 4 samples a bit", tr.Rate.Hz(), c.baud)
 	}
 	w := bufio.NewWriter(stdout)
 	for _, line := range decode(tr, c) {
@@ -83,7 +83,7 @@ type frame struct {
 
 // frames finds each frame from its start bit and samples each bit at its centre.
 func frames(tr *logic.Trace, c config) []frame {
-	bit := tr.Rate / c.baud
+	bit := tr.Rate.Hz() / c.baud
 	nbits := 9 + c.stop
 	if c.parity != "none" {
 		nbits++
@@ -131,13 +131,13 @@ func frames(tr *logic.Trace, c config) []frame {
 
 // decode groups frames into lines that end at a newline or an idle gap.
 func decode(tr *logic.Trace, c config) []string {
-	gap := int(c.gap.Seconds() * tr.Rate)
+	gap := int(c.gap.Seconds() * tr.Rate.Hz())
 	if c.gap == 0 {
 		nbits := 9 + c.stop
 		if c.parity != "none" {
 			nbits++
 		}
-		gap = int(10 * float64(nbits) * tr.Rate / c.baud)
+		gap = int(10 * float64(nbits) * tr.Rate.Hz() / c.baud)
 	}
 	var lines []string
 	var cur []frame
@@ -162,7 +162,7 @@ func decode(tr *logic.Trace, c config) []string {
 		} else {
 			text = strconv.Quote(string(data))
 		}
-		line := fmt.Sprintf("%+.9f %s", float64(cur[0].start-tr.TriggerAt)/tr.Rate, text)
+		line := fmt.Sprintf("%+.9f %s", float64(cur[0].start-tr.TriggerAt)/tr.Rate.Hz(), text)
 		if framing != nil {
 			line += " framing=" + strings.Join(framing, ",")
 		}

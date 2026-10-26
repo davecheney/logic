@@ -360,7 +360,7 @@ func fx2Read(ctx context.Context, r io.Reader, c Config) (*Trace, error) {
 					slices.Reverse(data[pos:])
 					slices.Reverse(data)
 					return &Trace{
-						Rate: c.Rate.Hz(), Channels: c.Channels, Source: c.Source,
+						Rate: c.Rate, Channels: c.Channels, Source: c.Source,
 						Falling: c.Falling, TriggerAt: pre, Triggered: triggered,
 						Width: 1, Samples: data,
 					}, nil
