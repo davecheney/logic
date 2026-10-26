@@ -8,10 +8,10 @@ Supported analysers:
 
 | Device | `-device` | Inputs | Details |
 |---|---|---|---|
-| BitScope Micro (BS05) | `bitscope` | L0 to L5 | [docs/bitscope.md](docs/bitscope.md) |
-| DreamSourceLab DSLogic (original) | `dslogic` | L0 to L15 | [docs/dslogic.md](docs/dslogic.md) |
-| Open Workbench Logic Sniffer | `ols` | L0 to L15 | [docs/ols.md](docs/ols.md) |
-| Generic Saleae Logic clone (8 channels, 24 MHz) | `fx2lafw` or `saleae` | L0 to L7 | [docs/fx2lafw.md](docs/fx2lafw.md) |
+| BitScope Micro (BS05) | `bitscope` | L0 to L5 | [bitscope](https://pkg.go.dev/github.com/davecheney/logic/bitscope) |
+| DreamSourceLab DSLogic (original) | `dslogic` | L0 to L15 | [dslogic](https://pkg.go.dev/github.com/davecheney/logic/dslogic) |
+| Open Workbench Logic Sniffer | `ols` | L0 to L15 | [ols](https://pkg.go.dev/github.com/davecheney/logic/ols) |
+| Generic Saleae Logic clone (8 channels, 24 MHz) | `fx2lafw` or `saleae` | L0 to L7 | [fx2lafw](https://pkg.go.dev/github.com/davecheney/logic/fx2lafw) |
 
 | Command | Use |
 |---|---|
@@ -47,10 +47,12 @@ More examples are in [docs/examples](docs/examples).
 
 ## Library
 
-Package `logic` holds the drivers and capture types. `Open` opens an
-analyser by name. `CapabilitiesFor` reports a device's resources without
-opening it. `ValidateCapture` checks a request on an open analyser.
-`Write` writes a `Trace` as JSON, CSV, or VCD. `Read` reads JSON captures.
+Package `logic` holds the capture types and the capability model. The
+drivers are in packages `bitscope`, `dslogic`, `fx2lafw`, and `ols`. Package
+`analyzer` selects a driver by name: `analyzer.Open` opens an analyser,
+and `analyzer.Validate` checks a `CaptureRequest` without opening one.
+`logic.Write` writes a `Trace` as JSON, CSV, or VCD. `logic.Read` reads
+the JSON back.
 
 `CaptureRequest.Rate` and `Trace.Rate` use `Frequency`, stored in milliHertz.
 For example, use `4 * logic.MegaHertz` for 4 MHz, or `rate.Hz()` when a
@@ -84,7 +86,8 @@ error when a request uses an invalid setting.
 go test ./...
 ```
 
-The BitScope hardware tests are in [docs/bitscope.md](docs/bitscope.md).
+The BitScope hardware tests are in the [bitscope](https://pkg.go.dev/github.com/davecheney/logic/bitscope) package
+documentation.
 
 ## License
 

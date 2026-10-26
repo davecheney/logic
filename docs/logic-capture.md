@@ -18,8 +18,9 @@ permit a capture without an edge. `-wait` is the total capture deadline.
 Do not use it to prove that an expected signal was absent after a trigger.
 
 The limits on rate, sample count, and pre-trigger depend on the analyser.
-See [bitscope.md](bitscope.md), [dslogic.md](dslogic.md),
-[ols.md](ols.md), and [fx2lafw.md](fx2lafw.md).
+See the [bitscope](https://pkg.go.dev/github.com/davecheney/logic/bitscope), [dslogic](https://pkg.go.dev/github.com/davecheney/logic/dslogic), and
+[fx2lafw](https://pkg.go.dev/github.com/davecheney/logic/fx2lafw), and
+[ols](https://pkg.go.dev/github.com/davecheney/logic/ols) package documentation.
 
 `-rate` is a frequency with a unit: `mHz`, `Hz`, `kHz`, `MHz`, or `GHz`.
 The units are case sensitive. A number without a unit is in Hz, so

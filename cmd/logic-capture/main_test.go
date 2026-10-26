@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/davecheney/logic"
+	"github.com/davecheney/logic/analyzer"
 )
 
 type testCapabilities []logic.Resource
@@ -54,7 +55,7 @@ func TestHelp(t *testing.T) {
 }
 
 func TestCaptureRequestRejectsNonDigitalResource(t *testing.T) {
-	caps, err := logic.CapabilitiesFor("bitscope")
+	caps, err := analyzer.CapabilitiesFor("bitscope")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +68,7 @@ func TestCaptureRequestRejectsNonDigitalResource(t *testing.T) {
 }
 
 func TestCaptureRequestUsesResourceRoles(t *testing.T) {
-	caps, err := logic.CapabilitiesFor("bitscope")
+	caps, err := analyzer.CapabilitiesFor("bitscope")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +93,7 @@ func TestCaptureRequestUsesResourceRoles(t *testing.T) {
 }
 
 func TestCaptureRequestUsesOLSResources(t *testing.T) {
-	caps, err := logic.CapabilitiesFor("ols")
+	caps, err := analyzer.CapabilitiesFor("ols")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,11 +106,11 @@ func TestCaptureRequestUsesOLSResources(t *testing.T) {
 	if len(req.Inputs) != 2 || req.Trigger.Index() != 8 {
 		t.Fatalf("request: %+v", req)
 	}
-	if err := logic.Validate("ols", req); err != nil {
+	if err := analyzer.Validate("ols", req); err != nil {
 		t.Fatalf("validate OLS request: %v", err)
 	}
 	req.Rate = 101 * logic.MegaHertz
-	if err := logic.Validate("ols", req); err == nil {
+	if err := analyzer.Validate("ols", req); err == nil {
 		t.Fatal("accepted rate above 100 MHz")
 	}
 }

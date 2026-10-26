@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/davecheney/logic"
+	"github.com/davecheney/logic/analyzer"
+	"github.com/davecheney/logic/dslogic"
 )
 
 type captureOptions struct {
@@ -31,7 +33,7 @@ type captureOptions struct {
 func run(args []string, stdout, stderr io.Writer) (err error) {
 	flags := flag.NewFlagSet("logic-capture", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	device := flags.String("device", "", "analyser, required: "+strings.Join(logic.Devices(), ", "))
+	device := flags.String("device", "", "analyser, required: "+strings.Join(analyzer.Devices(), ", "))
 	port := flags.String("port", "", "BitScope or OLS serial port (default: search)")
 	threshold := flags.String("threshold", "3.3", "DSLogic input threshold: 3.3 or 5 (volts)")
 	rate := 4 * logic.MegaHertz
@@ -64,16 +66,16 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	if err := applyPreset(*preset, set, *device, &cfg, wait); err != nil {
 		return err
 	}
-	var th logic.Threshold
+	var th dslogic.Threshold
 	switch *threshold {
 	case "3.3":
-		th = logic.Threshold3V3
+		th = dslogic.Threshold3V3
 	case "5":
-		th = logic.Threshold5V
+		th = dslogic.Threshold5V
 	default:
 		return errors.New("threshold must be 3.3 or 5")
 	}
-	caps, err := logic.CapabilitiesFor(*device)
+	caps, err := analyzer.CapabilitiesFor(*device)
 	if err != nil {
 		return err
 	}
@@ -81,7 +83,7 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := logic.Validate(*device, req); err != nil {
+	if err := analyzer.Validate(*device, req); err != nil {
 		return err
 	}
 	if *format != "csv" && *format != "json" && *format != "vcd" {
@@ -97,7 +99,7 @@ func run(args []string, stdout, stderr io.Writer) (err error) {
 			return err
 		}
 	}
-	dev, err := logic.Open(*device, *port, th)
+	dev, err := analyzer.Open(*device, *port, th)
 	if err != nil {
 		return err
 	}
@@ -229,7 +231,7 @@ func applyPreset(name string, set map[string]bool, device string, cfg *captureOp
 		cfg.Rate = logic.MegaHertz
 	}
 	if !set["samples"] {
-		caps, err := logic.CapabilitiesFor(device)
+		caps, err := analyzer.CapabilitiesFor(device)
 		if err != nil {
 			return err
 		}
