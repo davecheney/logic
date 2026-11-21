@@ -21,9 +21,10 @@ Supported analysers:
 | [`logic-edges`](docs/logic-edges.md) | List the level changes in a capture |
 | [`logic-i2c`](docs/logic-i2c.md) | Decode I2C in a capture |
 | [`logic-uart`](docs/logic-uart.md) | Decode UART in a capture |
+| [`logic-spi`](docs/logic-spi.md) | Decode SPI in a capture |
 
 Every command that opens an analyser needs `-device`. There is no default
-device. `logic-edges`, `logic-i2c`, and `logic-uart` read a `logic-capture`
+device. `logic-edges`, `logic-i2c`, `logic-spi`, and `logic-uart` read a `logic-capture`
 JSON file.
 
 ## Install
